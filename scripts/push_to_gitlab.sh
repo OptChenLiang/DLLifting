@@ -1,20 +1,23 @@
 #!/usr/bin/env bash
+# Publish/update the DLLifting package on GitLab (preserves remote history).
 set -euo pipefail
 
 REPO_URL="${1:-git@159.226.92.34:wangxintong/dllifting.git}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORK_DIR="${TMPDIR:-/tmp}/dllifting-publish-$$"
+MSG_FILE="${WORK_DIR}/commit_msg.txt"
 
 echo "Package: ${PKG_DIR}"
 echo "Remote:  ${REPO_URL}"
 echo "Work:    ${WORK_DIR}"
 
 rm -rf "${WORK_DIR}"
-mkdir -p "${WORK_DIR}"
+git clone "${REPO_URL}" "${WORK_DIR}"
 
-rsync -a \
+rsync -a --delete \
   --exclude 'build/' \
+  --exclude '.git/' \
   --exclude 'test_dllifting' \
   --exclude 'test_dllifting_reduction' \
   --exclude 'test_isgeq' \
@@ -27,19 +30,23 @@ rsync -a \
   "${PKG_DIR}/" "${WORK_DIR}/"
 
 cd "${WORK_DIR}"
-git init
-git checkout -b main 2>/dev/null || git branch -M main
-
 git add -A
-git commit -m "Release DLLifting library (DL/DP hybrid knapsack lifting)"
 
-if git remote | grep -q '^origin$'; then
-  git remote set-url origin "${REPO_URL}"
-else
-  git remote add origin "${REPO_URL}"
+if git diff --cached --quiet; then
+  echo "No changes to push."
+  rm -rf "${WORK_DIR}"
+  exit 0
 fi
 
-echo "Pushing to origin main ..."
-git push -u origin main
+cat > "${MSG_FILE}" <<'EOF'
+Update DLLifting: DP unbounded fix, mixed-variable tests, restructured layout
+EOF
+
+# Use -F to avoid shell/git alias issues with -m on older git.
+/usr/bin/git commit -F "${MSG_FILE}" || git commit -F "${MSG_FILE}"
+
+git push origin main
 
 echo "Done: ${REPO_URL}"
+git log -1 --oneline
+rm -rf "${WORK_DIR}"

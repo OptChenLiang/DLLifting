@@ -2,7 +2,7 @@
  * Tests for DLLifting with isleq = 0 (knapsack constraint sum w_i x_i >= cap).
  * Compares DP / dominated-list building and full lifting against brute-force references.
  */
-#include "DLLifting.h"
+#include <DLLifting.h>
 #include <stdio.h>
 #include <string.h>
 

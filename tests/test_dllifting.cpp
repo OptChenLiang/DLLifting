@@ -2,7 +2,7 @@
  * Comprehensive tests for DLLifting/ only.
  * Validates DP table, DL table, DL<->DP consistency, and end-to-end lifting.
  */
-#include "DLLifting.h"
+#include <DLLifting.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>

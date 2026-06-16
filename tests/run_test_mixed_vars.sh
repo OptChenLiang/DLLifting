@@ -1,12 +1,12 @@
 #!/bin/bash
 # Compare DL, DP, DL+R, DP+R on mixed binary/bounded/unbounded instances.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 make test_mixed_vars test_mixed_vars_r
 
-OUT_N=results_mixed_N.txt
-OUT_R=results_mixed_R.txt
+OUT_N=tests/results_mixed_N.txt
+OUT_R=tests/results_mixed_R.txt
 
 ./test_mixed_vars  | tee "$OUT_N"
 ./test_mixed_vars_r | tee "$OUT_R"
@@ -32,7 +32,7 @@ def load(path):
             n=int(n), ok=int(ok), t=float(t), rhs=float(rhs), red=int(red), ub=int(ub))
     return d
 
-n = load("results_mixed_N.txt")
+n = load("tests/results_mixed_N.txt")
 r = load("results_mixed_R.txt")
 cases = sorted(set(n) | set(r))
 
@@ -57,8 +57,8 @@ for case in cases:
     agree = "yes" if dl and dp and dl["ok"] and dp["ok"] and abs(dl["rhs"] - dp["rhs"]) < 1e-4 else "no"
     print(f"{case:<20} {nval:3d} {g('N','DL','t')} {g('N','DP','t')} {g('R','DL','t')} {g('R','DP','t')}  {agree}")
 
-ok_n = sum(1 for line in open("results_mixed_N.txt") if line.startswith("OK:"))
-warn_n = sum(1 for line in open("results_mixed_N.txt") if "WARN:" in line)
+ok_n = sum(1 for line in open("tests/results_mixed_N.txt") if line.startswith("OK:"))
+warn_n = sum(1 for line in open("tests/results_mixed_N.txt") if "WARN:" in line)
 print(f"\nStats (build N): OK={ok_n} WARN={warn_n}")
 print("Notes: build N=DL/DP; R=DL+R/DP+R; ub=1 => red off; times in seconds.")
 PY

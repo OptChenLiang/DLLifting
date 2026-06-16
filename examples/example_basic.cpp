@@ -1,7 +1,7 @@
 /**
  * Minimal C++ example: lift a <= cover inequality and print the cut.
  */
-#include "DLLifting.h"
+#include <DLLifting.h>
 #include <cstdio>
 
 int main()

@@ -1,5 +1,5 @@
-#include "dllifting/dllifting_c.h"
-#include "DLLifting.h"
+#include <dllifting_c.h>
+#include <DLLifting.h>
 
 #include <cstring>
 

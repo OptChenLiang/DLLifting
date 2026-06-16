@@ -3,7 +3,7 @@
  * Sizes: n in {5,8,10,12,14,15,18,20}; hand + random seeds; DL & DP (N / R).
  * Run: make run-mixed
  */
-#include "DLLifting.h"
+#include <DLLifting.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>

@@ -10,8 +10,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-set(DLLIFTING_SOURCES DLLifting.cpp src/dllifting_c.cpp)
-set(DLLIFTING_HEADERS DLLifting.h include/dllifting/dllifting_c.h)
+set(DLLIFTING_SOURCES src/DLLifting.cpp src/dllifting_c.cpp)
+set(DLLIFTING_HEADERS include/DLLifting.h include/dllifting_c.h)
 
 if(DLLIFTING_BUILD_SHARED)
   add_library(dllifting SHARED ${DLLIFTING_SOURCES})
@@ -22,7 +22,6 @@ endif()
 
 target_include_directories(dllifting
   PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
@@ -50,9 +49,7 @@ install(TARGETS dllifting
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-install(FILES DLLifting.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dllifting)
-install(FILES include/dllifting/dllifting_c.h
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dllifting)
+install(FILES ${DLLIFTING_HEADERS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 install(EXPORT dlliftingTargets
   FILE dlliftingTargets.cmake
@@ -83,12 +80,5 @@ endif()
 
 if(DLLIFTING_BUILD_TESTS)
   enable_testing()
-  add_executable(test_dllifting test_dllifting.cpp)
-  target_link_libraries(test_dllifting PRIVATE dllifting)
-  target_compile_definitions(test_dllifting PRIVATE DLLIFTING_REDUCTION)
-  add_test(NAME test_dllifting COMMAND test_dllifting)
-
-  add_executable(test_isgeq test_isgeq.cpp)
-  target_link_libraries(test_isgeq PRIVATE dllifting)
-  # Legacy >= tests; run manually: ./test_isgeq
+  add_subdirectory(tests)
 endif()

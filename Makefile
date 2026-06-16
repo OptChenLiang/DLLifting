@@ -1,38 +1,34 @@
-
-# Stand-alone tests for DLLifting (no CPLEX required)
+# Stand-alone tests for DLLifting (no external solver required)
 CXX = g++
-CXXFLAGS = -Wall -Wextra -O2 -DDLLIFTING -DNDEBUG -DDLLIFTING_REDUCTION
+CXXFLAGS = -Wall -Wextra -O2 -Iinclude -DNDEBUG
 LIBS = -lm
 
-test_dllifting: test_dllifting.cpp DLLifting.cpp DLLifting.h
-	$(CXX) $(CXXFLAGS) test_dllifting.cpp DLLifting.cpp -o $@ $(LIBS)
+SRC = src/DLLifting.cpp src/dllifting_c.cpp
 
-test_isgeq: test_isgeq.cpp DLLifting.cpp DLLifting.h
-	$(CXX) $(CXXFLAGS) test_isgeq.cpp DLLifting.cpp -o $@ $(LIBS)
+test_dllifting: tests/test_dllifting.cpp $(SRC) include/DLLifting.h
+	$(CXX) $(CXXFLAGS) -DDLLIFTING_REDUCTION tests/test_dllifting.cpp $(SRC) -o $@ $(LIBS)
 
-test_mixed_vars: test_mixed_vars.cpp DLLifting.cpp DLLifting.h
-	$(CXX) -Wall -Wextra -O2 -DDLLIFTING -DNDEBUG test_mixed_vars.cpp DLLifting.cpp -o $@ $(LIBS)
+test_isgeq: tests/test_isgeq.cpp $(SRC) include/DLLifting.h
+	$(CXX) $(CXXFLAGS) -DDLLIFTING_REDUCTION tests/test_isgeq.cpp $(SRC) -o $@
 
-test_mixed_vars_r: test_mixed_vars.cpp DLLifting.cpp DLLifting.h
-	$(CXX) $(CXXFLAGS) test_mixed_vars.cpp DLLifting.cpp -o $@ $(LIBS)
+test_mixed_vars: tests/test_mixed_vars.cpp $(SRC) include/DLLifting.h
+	$(CXX) $(CXXFLAGS) tests/test_mixed_vars.cpp $(SRC) -o $@ $(LIBS)
+
+test_mixed_vars_r: tests/test_mixed_vars.cpp $(SRC) include/DLLifting.h
+	$(CXX) $(CXXFLAGS) -DDLLIFTING_REDUCTION tests/test_mixed_vars.cpp $(SRC) -o $@ $(LIBS)
 
 run-mixed: test_mixed_vars test_mixed_vars_r
-	./run_test_mixed_vars.sh
+	./tests/run_test_mixed_vars.sh
 
 run: test_dllifting
 	./test_dllifting
-
-run-reduction: test_dllifting_reduction
-	./test_dllifting_reduction
-
-test_dllifting_reduction: test_dllifting.cpp DLLifting.cpp DLLifting.h
-	$(CXX) $(CXXFLAGS) -DREDUCTION test_dllifting.cpp DLLifting.cpp -o $@ $(LIBS)
 
 run-all: test_dllifting test_isgeq
 	./test_dllifting
 	./test_isgeq
 
 clean:
-	rm -f test_dllifting test_dllifting_reduction test_isgeq test_mixed_vars test_mixed_vars_r results_mixed_*.txt
+	rm -f test_dllifting test_isgeq test_mixed_vars test_mixed_vars_r
+	rm -f tests/results_mixed_*.txt
 
-.PHONY: run run-reduction run-all run-mixed clean
+.PHONY: run run-all run-mixed clean

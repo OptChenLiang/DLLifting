@@ -24,7 +24,7 @@ The lifted output is new coefficients in `p[]` and an updated `rhs`.
 ## C++ (recommended)
 
 ```cpp
-#include "DLLifting.h"
+#include <DLLifting.h>
 
 void add_lifted_cover_cut(/* solver handles */, int n, ...) {
   double rhs = 0;
@@ -40,7 +40,7 @@ void add_lifted_cover_cut(/* solver handles */, int n, ...) {
 ## C API
 
 ```c
-#include "dllifting/dllifting_c.h"
+#include <dllifting_c.h>
 
 double rhs;
 int rc = dllifting_lift_cover(n, coef, weight, ub, use_ub,

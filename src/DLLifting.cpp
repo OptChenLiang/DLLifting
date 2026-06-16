@@ -3,7 +3,7 @@
  * @brief Implementation of DL/DP hybrid knapsack lifting.
  **/
 
-#include "DLLifting.h"
+#include <DLLifting.h>
 #include <cstring>
 
 #define INITSIZE_LIFTING 5000000

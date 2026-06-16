@@ -1,0 +1,14 @@
+add_executable(test_dllifting test_dllifting.cpp)
+target_link_libraries(test_dllifting PRIVATE dllifting)
+target_compile_definitions(test_dllifting PRIVATE DLLIFTING_REDUCTION)
+add_test(NAME test_dllifting COMMAND test_dllifting)
+
+add_executable(test_isgeq test_isgeq.cpp)
+target_link_libraries(test_isgeq PRIVATE dllifting)
+
+add_executable(test_mixed_vars test_mixed_vars.cpp)
+target_link_libraries(test_mixed_vars PRIVATE dllifting)
+
+add_executable(test_mixed_vars_r test_mixed_vars.cpp)
+target_link_libraries(test_mixed_vars_r PRIVATE dllifting)
+target_compile_definitions(test_mixed_vars_r PRIVATE DLLIFTING_REDUCTION)

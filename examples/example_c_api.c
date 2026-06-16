@@ -1,4 +1,4 @@
-#include "dllifting/dllifting_c.h"
+#include <dllifting_c.h>
 #include <stdio.h>
 
 int main(void)
