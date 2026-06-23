@@ -12,9 +12,6 @@
 #include <unistd.h>
 
 #define MAX_MIX 32
-#define DL_THRESHOLD 0.0
-#define DP_THRESHOLD 100000.0
-
 #ifdef DLLIFTING_REDUCTION
 static const char* BUILD_TAG = "R";
 #else
@@ -77,7 +74,7 @@ struct LiftOutcome {
    int reduction_active;
 };
 
-static LiftOutcome run_lifting_once(const MixedCase& c, double threshold)
+static LiftOutcome run_lifting_once(const MixedCase& c, int isdl_mode)
 {
    LiftOutcome out;
    memset(&out, 0, sizeof(out));
@@ -97,7 +94,8 @@ static LiftOutcome run_lifting_once(const MixedCase& c, double threshold)
 
    clock_t t0 = clock();
    out.ok = lifting(&lift, p, w, u, isuseub, c.cap, 0,
-         seed, c.n_seed, order, c.n_ord, &rhs, 1, NULL, c.n, threshold, 0.0);
+         seed, c.n_seed, order, c.n_ord, &rhs, 1, NULL, c.n, 0.0, 0.0,
+         isdl_mode);
    out.duration = (double)(clock() - t0) / CLOCKS_PER_SEC;
    out.rhs = rhs;
    memcpy(out.p, p, (size_t)c.n * sizeof(double));
@@ -153,8 +151,8 @@ static void print_outcome(const char* case_name, const char* algo, const MixedCa
 
 static void test_case_impl(const MixedCase& c)
 {
-   LiftOutcome dl = run_lifting_once(c, DL_THRESHOLD);
-   LiftOutcome dp = run_lifting_once(c, DP_THRESHOLD);
+   LiftOutcome dl = run_lifting_once(c, DLLIFTING_MODE_DL);
+   LiftOutcome dp = run_lifting_once(c, DLLIFTING_MODE_DP);
 
    print_outcome(c.name, "DL", c, dl);
    print_outcome(c.name, "DP", c, dp);

@@ -31,6 +31,12 @@
 
 #define EPS_DL 1e-6
 #define INF_DL 1e+20
+/** lifting(..., isdl_mode): auto DL/DP switch by threshold */
+#define DLLIFTING_MODE_AUTO (-1)
+/** Force DP table (isDL=0); no threshold switching */
+#define DLLIFTING_MODE_DP    0
+/** Force DL table (isDL=1); no threshold switching */
+#define DLLIFTING_MODE_DL    1
 #define MIN_DL(a,b) (a<=b? a:b) 
 #define MAX_DL(a,b) (a>=b? a:b) 
 #define FLOOR_DL(a) ( floor( a + EPS_DL ) )
@@ -124,7 +130,7 @@ typedef struct DLLifting
    DTptype*           psum2;
    DTwtype*           wsum2;
 
-   int                onlyDL;
+   int                force_mode;       // DLLIFTING_MODE_* ; >=0 disables threshold switching
    int                isDL;             // 1: DL table is authoritative; 0: dplist is */
 
    double             threshold;       // < 100: prefer DL; > 100: prefer DP */
@@ -162,7 +168,7 @@ int Lifting_Mergesort(DLLifting* lift, DTptype p, DTwtype w);
 // Merge an item with effectively unbounded multiplicity
 int Lifting_Mergesortinf(DLLifting* lift, DTptype p, DTwtype w);
 
-// Add item (p, w) via binary splitting; switches DL/DP by threshold
+// Add item (p, w) via binary splitting; respects force_mode / threshold
 int Lifting_Multiply(DLLifting* lift, DTptype p, DTwtype w, DTutype u);
 
 // Query DL table: last breakpoint with wsum <= cap or min profit with wsum >= cap
@@ -183,7 +189,8 @@ int Lifting_Lifting(DLLifting* lift, DTptype* rhs);
  * @param seed     Variables fixed in the seed inequality
  * @param liftingorder  Remaining variables in lifting order
  * @param isLeq    1 for <= knapsack; 0 for >= knapsack
- * @param threshold  < 100 uses DL; > 100 uses DP
+ * @param threshold  < 100 uses DL; > 100 uses DP (when isdl_mode = DLLIFTING_MODE_AUTO)
+ * @param isdl_mode  DLLIFTING_MODE_AUTO / _DP / _DL — force table without switching
  * @return 1 on success; writes lifted coefficients into p and rhs.
  */
 DLLIFTING_API int lifting(
@@ -193,7 +200,7 @@ DLLIFTING_API int lifting(
       int* seed, int n_seed,
       int* liftingorder, int n_liftingorder,
       double* rhs,
-      int isLeq, double* x, int n, double threshold, double duration);
+      int isLeq, double* x, int n, double threshold, double duration, int isdl_mode);
 
 int lifting_lifting(DLLifting* lift, DTptype* alpha, DTwtype* a, DTutype* u, int* isuseub, DTptype *rhs, int n, int isleq);
 void Lifting_Printsoltable(DTptype* psum, DTwtype* wsum, int n);

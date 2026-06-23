@@ -19,7 +19,8 @@ The lifted output is new coefficients in `p[]` and an updated `rhs`.
 | `seed[]` | Variables in the initial cover |
 | `liftingorder[]` | Order for sequential lifting |
 | `isLeq` | 1 if knapsack is `<= b`, 0 if `>= b` |
-| `threshold` | 10 for DL, 200 for DP (same as in tests) |
+| `threshold` | Used when `isdl_mode = DLLIFTING_MODE_AUTO` (e.g. 10 for DL, 200 for DP) |
+| `isdl_mode` | `DLLIFTING_MODE_AUTO`, `_DL`, or `_DP` — see [API.md](API.md) |
 
 ## C++ (recommended)
 
@@ -31,7 +32,8 @@ void add_lifted_cover_cut(/* solver handles */, int n, ...) {
   DLLifting ctx;
   int ok = lifting(&ctx, p, w, u, isuseub, cap, 0,
                    seed, n_seed, order, n_order,
-                   &rhs, is_leq, x_frac, n, 10.0, 0.0);
+                   &rhs, is_leq, x_frac, n, 10.0, 0.0,
+                   DLLIFTING_MODE_AUTO);
   if (!ok) return;
   // solver->addCut(n, indices, p, '<=', rhs);
 }
@@ -45,7 +47,7 @@ void add_lifted_cover_cut(/* solver handles */, int n, ...) {
 double rhs;
 int rc = dllifting_lift_cover(n, coef, weight, ub, use_ub,
     cap, 0, seed, n_seed, order, n_order,
-    &rhs, is_leq, 10.0, x_frac);
+    &rhs, is_leq, 10.0, DLLIFTING_MODE_AUTO, x_frac);
 ```
 
 ## IBM CPLEX

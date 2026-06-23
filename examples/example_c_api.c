@@ -16,7 +16,7 @@ int main(void)
          n, coef, w, u, use_ub,
          4.0, 0,
          seed, 2, order, 1,
-         &rhs, 1, 10.0, NULL);
+         &rhs, 1, 10.0, DLLIFTING_MODE_AUTO, NULL);
 
    if(rc != DLLIFTING_OK)
    {

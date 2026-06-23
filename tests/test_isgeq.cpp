@@ -250,13 +250,13 @@ static void run_lifting_compare_paths(const char* name, int n,
    memset(&lift_dp, 0, sizeof(lift_dp));
 
    if (!lifting(&lift_dl, p_dl, w, u, isuseub, cap, 0, seed, n_seed,
-            order, n_ord, &rhs_dl, 0, NULL, n, 10.0, 0.0)) {
+            order, n_ord, &rhs_dl, 0, NULL, n, 10.0, 0.0, DLLIFTING_MODE_AUTO)) {
       fail("DL path lifting failed");
       return;
    }
 
    if (!lifting(&lift_dp, p_dp, w, u, isuseub, cap, 0, seed, n_seed,
-            order, n_ord, &rhs_dp, 0, NULL, n, 200.0, 0.0)) {
+            order, n_ord, &rhs_dp, 0, NULL, n, 200.0, 0.0, DLLIFTING_MODE_AUTO)) {
       fail("DP path lifting failed");
       return;
    }
@@ -381,7 +381,8 @@ static void run_lifting_case_ex(const char* name, int isleq, double threshold,
    rhs = 0;
 
    if (!lifting(&lift, p, w, u, isuseub, cap, 0, seed, n_seed,
-            liftingorder, n_liftingorder, &rhs, isleq, NULL, n, threshold, 0.0)) {
+            liftingorder, n_liftingorder, &rhs, isleq, NULL, n, threshold, 0.0,
+            DLLIFTING_MODE_AUTO)) {
       fail(name);
       printf("  lifting() returned 0\n");
       return;

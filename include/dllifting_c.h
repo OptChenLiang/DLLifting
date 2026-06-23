@@ -14,6 +14,11 @@ extern "C" {
 #define DLLIFTING_ERR_ALLOC   -1
 #define DLLIFTING_ERR_ARGS    -2
 
+/** isdl_mode for dllifting_lift_cover / lifting() */
+#define DLLIFTING_MODE_AUTO (-1)
+#define DLLIFTING_MODE_DP    0
+#define DLLIFTING_MODE_DL    1
+
 /**
  * Lift a cover inequality for a single knapsack row.
  *
@@ -32,7 +37,8 @@ extern "C" {
  * @param n_order        Length of lifting_order
  * @param rhs            Output: lifted inequality rhs
  * @param is_leq         1 for sum w x <= b, 0 for sum w x >= b
- * @param threshold      < 100 prefers DL merges, > 100 prefers DP
+ * @param threshold      Ignored when isdl_mode is _DL or _DP; else same as lifting()
+ * @param isdl_mode      DLLIFTING_MODE_AUTO / _DP / _DL (force isDL, no switching)
  * @param x_frac         Optional fractional point (may be NULL)
  * @return DLLIFTING_OK on success
  */
@@ -51,6 +57,7 @@ int dllifting_lift_cover(
     double* rhs,
     int is_leq,
     double threshold,
+    int isdl_mode,
     const double* x_frac);
 
 #ifdef __cplusplus

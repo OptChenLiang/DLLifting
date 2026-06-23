@@ -405,7 +405,7 @@ static void test_lifting_dp_valid(const char* tag, int isleq, int n,
    DLLifting L;
    memset(&L, 0, sizeof(L));
    if (!lifting(&L, p, w, u, isuseub, cap, 0, seed, n_seed, order, n_ord,
-            &rhs, isleq, NULL, n, 200.0, 0.0)) {
+            &rhs, isleq, NULL, n, 200.0, 0.0, DLLIFTING_MODE_AUTO)) {
       fail("lifting DP failed");
       return;
    }
@@ -438,14 +438,14 @@ static void test_lifting_dl_dp_agree(const char* tag, int isleq, int n,
    memset(&Lp, 0, sizeof(Lp));
 
    if (!lifting(&Ld, p_dl, w, u, isuseub, cap, 0, seed, n_seed, order, n_ord,
-            &rhs_dl, isleq, NULL, n, 10.0, 0.0)) {
+            &rhs_dl, isleq, NULL, n, 10.0, 0.0, DLLIFTING_MODE_AUTO)) {
       char buf[128];
       snprintf(buf, sizeof(buf), "%s: lifting DL path failed", tag);
       fail(buf);
       return;
    }
    if (!lifting(&Lp, p_dp, w, u, isuseub, cap, 0, seed, n_seed, order, n_ord,
-            &rhs_dp, isleq, NULL, n, 200.0, 0.0)) {
+            &rhs_dp, isleq, NULL, n, 200.0, 0.0, DLLIFTING_MODE_AUTO)) {
       fail("lifting DP failed");
       return;
    }

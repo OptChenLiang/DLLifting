@@ -18,6 +18,7 @@ int dllifting_lift_cover(
     double* rhs,
     int is_leq,
     double threshold,
+    int isdl_mode,
     const double* x_frac)
 {
    if(n <= 0 || coef == nullptr || weight == nullptr || ub == nullptr
@@ -95,7 +96,8 @@ int dllifting_lift_cover(
          const_cast<double*>(x_frac),
          n,
          threshold,
-         0.0);
+         0.0,
+         isdl_mode);
 
    delete[] order_mut;
    delete[] seed_mut;

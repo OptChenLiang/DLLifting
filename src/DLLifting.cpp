@@ -84,12 +84,12 @@ static void Lifting_update(DLLifting* lift, int w, double p, int unbounded)
       Lifting_DPiter(lift, w, p);
    if(lift->isDL)
    {
-      if(lift->threshold <= 100)
+      if(lift->force_mode == DLLIFTING_MODE_DL || lift->threshold <= 100)
       {
          Lifting_Compress(lift, 0);
          Lifting_Expand(lift);
       }
-      else
+      else if(lift->force_mode < 0)
          lift->isDL = false;
    }
 }
@@ -294,7 +294,7 @@ int Lifting_Alloc(DLLifting* lift, int len, int scale, double threshold)
       fprintf(stderr, "ERROR: malloc dplist\n");
       return 0;
    }
-   lift->isDL = true;
+   lift->isDL = (threshold <= 100.0) ? 1 : 0;
    lift->threshold = threshold;
    lift->maxsolsize = len; 
    return 1;
@@ -871,7 +871,7 @@ int Lifting_Multiply(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
                k = u;
             if(lift->isDL)
             {
-               if(lift->threshold > 100)
+               if(lift->force_mode < 0 && lift->threshold > 100)
                {
                   Lifting_Expand(lift);
                   Lifting_DPiter(lift, FLOOR_INT(w*k), p*k);
@@ -882,7 +882,7 @@ int Lifting_Multiply(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
             }
             else
             {
-               if(lift->threshold < 100)
+               if(lift->force_mode < 0 && lift->threshold < 100)
                {
                   Lifting_Compress(lift);
                   Lifting_Mergesort(lift, p*k, w*k);
@@ -914,7 +914,7 @@ int Lifting_Multiply(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
                Lifting_update(lift, FLOOR_INT(w*k), p*k, 0);
             else
             {
-               if(lift->threshold < 100)
+               if(lift->force_mode < 0 && lift->threshold < 100)
                {
                   Lifting_Compress(lift);
                   Lifting_Mergesort(lift, p*k, w*k);
@@ -1066,12 +1066,16 @@ int Lifting_Init(
       for(i = 0; i < lift->n_seed; i++)
       {
          v = lift->seed[i];
+         if(ISINF(lift->u[v]))
+            continue;
          if(lift->w[v] * lift->u[v] > lift->cap)
             lift->cap = lift->w[v] * lift->u[v];
       }
       for(i = 0; i < lift->n_liftingorder; i++)
       {
          v = lift->liftingorder[i];
+         if(ISINF(lift->u[v]))
+            continue;
          if(lift->w[v] * lift->u[v] > lift->cap)
             lift->cap = lift->w[v] * lift->u[v];
       }
@@ -1333,7 +1337,7 @@ int lifting(
       int* seed, int n_seed, 
       int* liftingorder, int n_liftingorder, 
       double* rhs,
-      int isleq, double* x, int n, double threshold, double duration)
+      int isleq, double* x, int n, double threshold, double duration, int isdl_mode)
 {
    if(lift == nullptr)
       return 0;
@@ -1346,17 +1350,34 @@ int lifting(
       for(i = 0; i < n_seed; i++)
       {
          v = seed[i];
-         if(w[v] * u[v] > allocCap)
-            allocCap = w[v] * u[v];
+         DTctype bound = ISINF(u[v]) ? cap : w[v] * u[v];
+         if(bound > allocCap)
+            allocCap = bound;
       }
       for(i = 0; i < n_liftingorder; i++)
       {
          v = liftingorder[i];
-         if(w[v] * u[v] > allocCap)
-            allocCap = w[v] * u[v];
+         DTctype bound = ISINF(u[v]) ? cap : w[v] * u[v];
+         if(bound > allocCap)
+            allocCap = bound;
       }
       if(Lifting_Alloc(lift, FLOOR_INT(allocCap), 1, threshold) == 0)
          return 0;
+   }
+
+   if(isdl_mode == DLLIFTING_MODE_DP)
+   {
+      lift->isDL = 0;
+      lift->force_mode = DLLIFTING_MODE_DP;
+   }
+   else if(isdl_mode == DLLIFTING_MODE_DL)
+   {
+      lift->isDL = 1;
+      lift->force_mode = DLLIFTING_MODE_DL;
+   }
+   else
+   {
+      lift->force_mode = DLLIFTING_MODE_AUTO;
    }
 
    Lifting_Init(lift, p, w, u, isuseub, cap, issubcap, seed, n_seed, liftingorder, n_liftingorder, isleq, x, cap, n); 

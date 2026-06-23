@@ -18,7 +18,7 @@ int main()
 
    DLLifting lift = {};
    if(!lifting(&lift, p, w, u, isuseub, cap, 0, seed, 2, order, 1,
-            &rhs, 1, nullptr, n, 10.0, 0.0))
+            &rhs, 1, nullptr, n, 10.0, 0.0, DLLIFTING_MODE_AUTO))
    {
       fprintf(stderr, "lifting failed\n");
       return 1;

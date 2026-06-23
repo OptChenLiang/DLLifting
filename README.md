@@ -7,6 +7,7 @@
 ## Features
 
 - Hybrid **DL** (threshold &lt; 100) and **DP** (threshold &gt; 100) subproblem solvers
+- **Forced mode** (`DLLIFTING_MODE_DL` / `_DP`) for bounded and unbounded items — no threshold switching (v1.1.0)
 - Optional **capacity reduction** (`tableleft`) for faster lifting
 - C++ API (`lifting()`) and stable **C ABI** (`dllifting_lift_cover()`)
 - CMake package config for `find_package(dllifting)`
@@ -63,7 +64,7 @@ g++ -O2 my_app.cpp -I/path/to/dllifting/include -L/path/to/lib -ldllifting -lm -
 #include <dllifting_c.h>
 ```
 
-See `examples/example_basic.cpp` and `examples/example_c_api.c`.
+See `examples/example_basic.cpp`, `examples/example_c_api.c`, and `examples/example_force_mode.cpp`.
 
 ## Public API
 
@@ -72,18 +73,29 @@ See `examples/example_basic.cpp` and `examples/example_c_api.c`.
 | `lifting()` | C++ | Full sequential lifting; see `include/DLLifting.h` |
 | `dllifting_lift_cover()` | C | Wrapper in `include/dllifting_c.h` |
 
+**Lifting mode** (last argument / before `x_frac`):
+
+| Constant | Effect |
+|----------|--------|
+| `DLLIFTING_MODE_AUTO` | Threshold-based DL↔DP switch on bounded items (default for integrators) |
+| `DLLIFTING_MODE_DL` | Force DL table; no switching |
+| `DLLIFTING_MODE_DP` | Force DP table; no switching |
+
+Full reference: [docs/API.md](docs/API.md). Upgrading from 1.0.0: [docs/MIGRATION.md](docs/MIGRATION.md). Release notes: [CHANGELOG.md](CHANGELOG.md).
+
 Solver integration (CPLEX, Gurobi, …): [docs/INTEGRATION_SOLVERS.md](docs/INTEGRATION_SOLVERS.md).
 
 ## Project layout
 
 ```
 dllifting/
-├── include/   # Public headers
+├── include/             # Public headers
 ├── src/                 # Library implementation
 ├── examples/            # Minimal usage examples
 ├── tests/               # Unit and regression tests
-├── docs/                # Integration and testing notes
-└── cmake/               # CMake package config template
+├── docs/                # API, migration, integration, testing
+├── cmake/               # CMake package config template
+└── CHANGELOG.md         # Release history
 ```
 
 ## CMake options

@@ -3,6 +3,7 @@
 set -euo pipefail
 
 REPO_URL="${1:-git@159.226.92.34:wangxintong/dllifting.git}"
+COMMIT_MSG="${2:-Release 1.1.0: forced isdl_mode (DL/DP) for bounded and unbounded lifting}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PKG_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORK_DIR="${TMPDIR:-/tmp}/dllifting-publish-$$"
@@ -27,6 +28,7 @@ rsync -a --delete \
   --exclude 'results_mixed_*.txt' \
   --exclude 'examples/example_basic' \
   --exclude 'examples/example_c_api' \
+  --exclude 'examples/example_force_mode' \
   "${PKG_DIR}/" "${WORK_DIR}/"
 
 cd "${WORK_DIR}"
@@ -38,8 +40,8 @@ if git diff --cached --quiet; then
   exit 0
 fi
 
-cat > "${MSG_FILE}" <<'EOF'
-Update DLLifting: DP unbounded fix, mixed-variable tests, restructured layout
+cat > "${MSG_FILE}" <<EOF
+${COMMIT_MSG}
 EOF
 
 # Use -F to avoid shell/git alias issues with -m on older git.

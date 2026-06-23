@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(dllifting VERSION 1.0.0 LANGUAGES CXX C)
+project(dllifting VERSION 1.1.0 LANGUAGES CXX C)
 
 option(DLLIFTING_BUILD_SHARED "Build shared library" OFF)
 option(DLLIFTING_BUILD_EXAMPLES "Build example programs" ON)

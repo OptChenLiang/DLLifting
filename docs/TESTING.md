@@ -24,6 +24,7 @@ make run-all      # test_dllifting + test_isgeq
 
 - `isleq ∈ {0,1}`（`>=` / `<=` 背包）
 - `threshold ∈ {10, 200}`（DL / DP 路径）
+- `isdl_mode ∈ {AUTO, DL, DP}`（v1.1.0：`test_mixed_vars` 用 forced DL/DP 对比）
 - 物品数、上界 `u`、种子/升维顺序多种手算例 + 随机小例
 
 ## 当前结论（请以最新 `./test_dllifting` 输出为准）
@@ -53,5 +54,6 @@ make run-all      # test_dllifting + test_isgeq
 
 ## 其它文件
 
+- `test_mixed_vars.cpp`：混合有界/无界变量；分别用 `DLLIFTING_MODE_DL` 与 `_DP` 验证 forced mode
 - `test_isgeq.cpp`：`>=` 专项较早用例
 - `TEST_CASES_GEQ.md`：手算例参数表
