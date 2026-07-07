@@ -14,8 +14,10 @@ echo "Work:    ${WORK_DIR}"
 rm -rf "${WORK_DIR}"
 mkdir -p "${WORK_DIR}"
 
-rsync -a --exclude 'build/' --exclude 'test_dllifting' --exclude 'test_dllifting_reduction' \
-  --exclude 'test_isgeq' --exclude 'examples/example_basic' --exclude 'examples/example_c_api' \
+rsync -a --exclude 'build/' --exclude 'libdllifting.so' \
+  --exclude 'test_dllifting' --exclude 'test_isgeq' \
+  --exclude 'test_mixed_vars' --exclude 'test_mixed_vars_r' \
+  --exclude 'example' \
   "${PKG_DIR}/" "${WORK_DIR}/"
 
 cd "${WORK_DIR}"

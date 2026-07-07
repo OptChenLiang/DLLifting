@@ -1,115 +1,130 @@
 # DLLifting
 
-[![CI](https://github.com/wangxintong216-Cinty/dllifting/actions/workflows/ci.yml/badge.svg)](https://github.com/wangxintong216-Cinty/dllifting/actions/workflows/ci.yml)
+**DLLifting** is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports both `<=` and `>=` knapsack rows, optional capacity reduction (**DP_R** / **DL_R**), and can be embedded in MIP solvers via cut callbacks or custom separators.
 
-**DLLifting** is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports both `<=` and `>=` knapsack rows and can be embedded in MIP solvers via cut callbacks or custom separators.
+## Scope
 
-## Features
+- Knapsack set with general upper bounds (bounded and unbounded items)
+- Sequential up/down lifting with hybrid **DL** / **DP** subproblem solvers
+- Forced modes **DL**, **DP**, or threshold-based **AUTO** switching
+- Optional reduction variants **DL_R** / **DP_R** (compile-time `REDUCTION=1`)
+- Stable C ABI (`dllifting_lift_cover`) and full C++ API (`lifting`)
+- No dependency on external optimization libraries
 
-- Hybrid **DL** (threshold &lt; 100) and **DP** (threshold &gt; 100) subproblem solvers
-- **Forced mode** (`DLLIFTING_MODE_DL` / `_DP`) for bounded and unbounded items — no threshold switching (v1.1.0)
-- Optional **capacity reduction** (`tableleft`) for faster lifting
-- C++ API (`lifting()`) and stable **C ABI** (`dllifting_lift_cover()`)
-- CMake package config for `find_package(dllifting)`
-- No external solver dependencies
+## Requirements
 
-## Quick start
+- C++11 compiler (GCC, Clang, or MSVC)
+- GNU Make
 
-### Build and install
+## Build
 
-```bash
-git clone https://github.com/wangxintong216-Cinty/dllifting.git
-cd dllifting
-mkdir -p build && cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/.local \
-         -DDLLIFTING_REDUCTION=ON \
-         -DDLLIFTING_BUILD_EXAMPLES=ON \
-         -DDLLIFTING_BUILD_TESTS=ON
-cmake --build .
-ctest          # optional
-cmake --install .
-```
+| Target | Command | What it does |
+| ------ | ------- | ------------ |
+| Library only | `make` | Compile sources and produce the shared library `libdllifting.so`. Does not build or run tests or examples. |
+| Unit tests | `make test` | Build `libdllifting.so` and run `test_dllifting` + `test_isgeq`. Fails if any test fails. |
+| Extended tests | `make test-all` | Run `make test` plus mixed-variable regression (`test_mixed_vars`, `test_mixed_vars_r`). |
+| Example program | `make example` | Build the `example` binary (see `examples/example.cpp`). Execute `./example` afterward. |
 
-### Legacy Makefile (tests only)
+Compile-time reduction support is enabled by default (`REDUCTION=1`). To disable:
 
 ```bash
-make run          # main test suite
-make run-all      # test_dllifting + test_isgeq
-make run-mixed    # mixed-variable benchmark
+make REDUCTION=0
+make test REDUCTION=0
 ```
 
-## Use in your project
-
-### CMake
-
-```cmake
-find_package(dllifting CONFIG REQUIRED)
-add_executable(my_cut_gen my_cut_gen.cpp)
-target_link_libraries(my_cut_gen PRIVATE dllifting::dllifting)
-```
-
-```cpp
-#include <DLLifting.h>
-```
-
-### Manual link
+Link your own program against the shared library:
 
 ```bash
-g++ -O2 my_app.cpp -I/path/to/dllifting/include -L/path/to/lib -ldllifting -lm -o my_app
+g++ -O2 my_app.cpp -Iinclude -L. -ldllifting -Wl,-rpath,'$ORIGIN' -lm -o my_app
 ```
 
-### C API
+Install headers and the shared library (optional):
 
-```c
-#include <dllifting_c.h>
+```bash
+make install PREFIX=$HOME/.local
 ```
 
-See `examples/example_basic.cpp`, `examples/example_c_api.c`, and `examples/example_force_mode.cpp`.
+## API
 
-## Public API
+All public symbols are declared in `include/DLLifting.h`.
 
-| Entry | Language | Description |
-|-------|----------|-------------|
-| `lifting()` | C++ | Full sequential lifting; see `include/DLLifting.h` |
-| `dllifting_lift_cover()` | C | Wrapper in `include/dllifting_c.h` |
-
-**Lifting mode** (last argument / before `x_frac`):
+### Lifting modes
 
 | Constant | Effect |
-|----------|--------|
-| `DLLIFTING_MODE_AUTO` | Threshold-based DL↔DP switch on bounded items (default for integrators) |
+| -------- | ------ |
+| `DLLIFTING_MODE_AUTO` | Threshold-based DL↔DP switch on bounded items (default) |
 | `DLLIFTING_MODE_DL` | Force DL table; no switching |
 | `DLLIFTING_MODE_DP` | Force DP table; no switching |
 
-Full reference: [docs/API.md](docs/API.md). Upgrading from 1.0.0: [docs/MIGRATION.md](docs/MIGRATION.md). Release notes: [CHANGELOG.md](CHANGELOG.md).
+### `lifting` (C++)
 
-Solver integration (CPLEX, Gurobi, …): [docs/INTEGRATION_SOLVERS.md](docs/INTEGRATION_SOLVERS.md).
+Full sequential lifting with prescribed seed and lifting order. See `include/DLLifting.h` for the complete signature and `Lifting` / `DLLifting` workspace type.
+
+### `dllifting_lift_cover` (C)
+
+Stable C wrapper for solver callbacks:
+
+```c
+int dllifting_lift_cover(
+      int n, double* coef,
+      const double* weight, const double* ub, const int* use_ub,
+      double cap, int is_subcap,
+      const int* seed, int n_seed,
+      const int* lifting_order, int n_order,
+      double* rhs,
+      int is_leq, double threshold, int isdl_mode,
+      const double* x_frac);
+```
+
+**Return value:** `DLLIFTING_OK` (0) on success; negative error code otherwise.
+
+### Example
+
+```cpp
+#include <DLLifting.h>
+#include <cstdio>
+
+int main() {
+   const int n = 3;
+   double p[] = {1.0, 1.0, 0.0};
+   double w[] = {2.0, 3.0, 4.0};
+   double u[] = {1.0, 1.0, 1.0};
+   int isuseub[] = {0, 0, 0};
+   int seed[] = {0, 1};
+   int order[] = {2};
+   double rhs = 0.0;
+
+   DLLifting lift = {};
+   if (!lifting(&lift, p, w, u, isuseub, 4.0, 0, seed, 2, order, 1,
+            &rhs, 1, nullptr, n, 10.0, 0.0, DLLIFTING_MODE_AUTO))
+      return 1;
+
+   for (int i = 0; i < n; i++)
+      if (p[i] > EPS_DL)
+         std::printf("%.4f*x_%d + ", p[i], i + 1);
+   std::printf("<= %.4f  (%.4f s)\n", rhs, lift.duration);
+   return 0;
+}
+```
+
+More demos: `examples/example.cpp` (`make example && ./example`).
+
+Extended API notes, migration guide, and solver integration: see `docs/`.
 
 ## Project layout
 
 ```
 dllifting/
-├── include/             # Public headers
-├── src/                 # Library implementation
-├── examples/            # Minimal usage examples
-├── tests/               # Unit and regression tests
-├── docs/                # API, migration, integration, testing
-├── cmake/               # CMake package config template
-└── CHANGELOG.md         # Release history
+├── include/DLLifting.h   # public header (C++ + C ABI)
+├── src/DLLifting.cpp     # lifting implementation
+├── src/dllifting_c.cpp   # C wrapper
+├── libdllifting.so       # built by make (shared library)
+├── examples/             # usage examples
+├── tests/                # unit and regression tests
+├── docs/                 # API, migration, integration notes
+├── Makefile
+└── LICENSE
 ```
-
-## CMake options
-
-| Option | Default | Meaning |
-|--------|---------|---------|
-| `DLLIFTING_BUILD_SHARED` | OFF | Build shared library |
-| `DLLIFTING_REDUCTION` | ON | Capacity reduction (`tableleft`) |
-| `DLLIFTING_BUILD_EXAMPLES` | ON | Example binaries |
-| `DLLIFTING_BUILD_TESTS` | ON | `test_dllifting`, `test_isgeq`, … |
-
-## Testing
-
-See [docs/TESTING.md](docs/TESTING.md) for test coverage and known limitations on `>=` knapsacks.
 
 ## License
 
@@ -117,4 +132,4 @@ MIT License — see [LICENSE](LICENSE). Based on work by Igor Vasilyev and contr
 
 ## Citation
 
-If you use this library in research, please cite the associated knapsack lifting / separation work from your publication and link to this repository.
+If you use DLLifting in research, please cite the associated knapsack lifting / separation work from your publication and link to this repository.

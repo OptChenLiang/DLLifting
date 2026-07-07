@@ -19,16 +19,14 @@ git clone "${REPO_URL}" "${WORK_DIR}"
 rsync -a --delete \
   --exclude 'build/' \
   --exclude '.git/' \
+  --exclude 'libdllifting.so' \
   --exclude 'test_dllifting' \
-  --exclude 'test_dllifting_reduction' \
   --exclude 'test_isgeq' \
-  --exclude 'test_mixed' \
   --exclude 'test_mixed_vars' \
   --exclude 'test_mixed_vars_r' \
+  --exclude 'example' \
   --exclude 'results_mixed_*.txt' \
-  --exclude 'examples/example_basic' \
-  --exclude 'examples/example_c_api' \
-  --exclude 'examples/example_force_mode' \
+  --exclude 'tests/results_mixed_*.txt' \
   "${PKG_DIR}/" "${WORK_DIR}/"
 
 cd "${WORK_DIR}"

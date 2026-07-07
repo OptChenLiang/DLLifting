@@ -1,4 +1,3 @@
-#include <dllifting_c.h>
 #include <DLLifting.h>
 
 #include <cstring>

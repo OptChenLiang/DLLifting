@@ -114,6 +114,4 @@ Use these for benchmarks or when you want a fixed algorithm regardless of `thres
 
 ## Examples
 
-- Minimal C++: `examples/example_basic.cpp`
-- C ABI: `examples/example_c_api.c`
-- Forced DL vs DP: `examples/example_force_mode.cpp`
+- Combined demos (C++ + C ABI + forced mode): `examples/example.cpp` (`make example && ./example`)

@@ -124,6 +124,7 @@ typedef struct DLLifting
    double             rhs;
    double             tableleft;     // REDUCTION: L=sum u_i*w_i; m=subcap-L
    int                reduction_active; // 0 if any variable is unbounded (disable REDUCTION)
+   int                reduction_usable; // 1 if tableleft in (0, subcap] after init (REDUCTION can apply)
 
    DTptype*           psum1;
    DTwtype*           wsum1;
@@ -221,5 +222,43 @@ void Lifting_DPiterInf(DLLifting* lift, int w, double p);
 void Lifting_DPiter(DLLifting* lift, int w, double p);
 void Lifting_DPPrint(double* dp, int c);
 void Lifting_DPFree(double* dp);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/** Return codes for dllifting_lift_cover */
+#define DLLIFTING_OK           0
+#define DLLIFTING_ERR_ALLOC   -1
+#define DLLIFTING_ERR_ARGS    -2
+
+/**
+ * Lift a cover inequality for a single knapsack row (C ABI).
+ *
+ * Modifies @p coef in place and writes the lifted inequality rhs to @p rhs.
+ *
+ * @param isdl_mode  DLLIFTING_MODE_AUTO / _DP / _DL
+ */
+DLLIFTING_API int dllifting_lift_cover(
+      int n,
+      double* coef,
+      const double* weight,
+      const double* ub,
+      const int* use_ub,
+      double cap,
+      int is_subcap,
+      const int* seed,
+      int n_seed,
+      const int* lifting_order,
+      int n_order,
+      double* rhs,
+      int is_leq,
+      double threshold,
+      int isdl_mode,
+      const double* x_frac);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

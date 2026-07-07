@@ -49,6 +49,23 @@ static int Lifting_reduction(const DLLifting* lift, double* m_out)
    return 1;
 }
 
+static double Lifting_reduction_floor(const DLLifting* lift, double floor_m)
+{
+   double rm;
+   if(Lifting_reduction(lift, &rm) && rm > floor_m)
+      return rm;
+   return floor_m;
+}
+
+static int Lifting_reduction_start(const DLLifting* lift, int floor_j)
+{
+   double rm;
+   if(!Lifting_reduction(lift, &rm))
+      return floor_j;
+   int mb = CEIL_INT(rm);
+   return mb > floor_j ? mb : floor_j;
+}
+
 static double Lifting_length(const DLLifting* lift, int i)
 {
    if(Lifting_unbounded(lift, lift->w[i], lift->u[i]))
@@ -145,11 +162,7 @@ void Lifting_DPiter(DLLifting* lift, int w, double p)
    {
       double m = w;
 #ifdef REDUCTION 
-      {
-         double rm;
-         if(Lifting_reduction(lift, &rm) && rm > m)
-            m = rm;
-      }
+      m = Lifting_reduction_floor(lift, w);
 #endif
       double g = dp[c];
       int n_soltable = 1;
@@ -169,24 +182,15 @@ void Lifting_DPiter(DLLifting* lift, int w, double p)
    }
    else
    {
-      int jstart;
       for(j = 0; j <= w; j++ )
       {
          if(dp[j] > p) 
             dp[j] = p;
       }
 #ifdef REDUCTION
-      jstart = w + 1;
       {
-         double rm;
-         if(Lifting_reduction(lift, &rm))
-         {
-            int mb = CEIL_INT(rm);
-            if(jstart < mb)
-               jstart = mb;
-         }
-      }
-      for(j = jstart; j <= c; j++ )
+         int jstart = Lifting_reduction_start(lift, w + 1);
+         for(j = jstart; j <= c; j++ )
 #else
       for(j = w + 1; j <= c; j++ )
 #endif
@@ -196,6 +200,9 @@ void Lifting_DPiter(DLLifting* lift, int w, double p)
             dp[j] = dp[j-w] + p;
          }
       }
+#ifdef REDUCTION
+      }
+#endif
    }
 #ifdef DLTIME
    dptime += Lifting_GetTime() - tmp;
@@ -259,8 +266,8 @@ void Lifting_Check(DLLifting* lift)
 int Lifting_Alloc(DLLifting* lift, int len, int scale, double threshold)
 {
    len = len+1;
-   if(len > INITSIZE_LIFTING)
-      len = INITSIZE_LIFTING;
+   // Do not cap at INITSIZE_LIFTING: silent truncation caused buffer overruns when
+   // b (or variable upper bounds) exceed 5e6 on the lambda benchmark grid.
    if(lift->dplist != nullptr || lift->psum1 != nullptr)
       Lifting_Free(lift);
    if(sizeof(DTptype) !=  sizeof(DTwtype))
@@ -1061,6 +1068,14 @@ int Lifting_Init(
       lift->minweight = cap;
       Lifting_Calsubcap(lift);
    }
+#ifdef REDUCTION
+   {
+      double m;
+      lift->reduction_usable = Lifting_reduction(lift, &m) ? 1 : 0;
+   }
+#else
+   lift->reduction_usable = 0;
+#endif
    {
       int i, v;
       for(i = 0; i < lift->n_seed; i++)
@@ -1126,6 +1141,11 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
             }
             else
             {
+#ifdef REDUCTION
+               double rm;
+               if(Lifting_reduction(lift, &rm) && lift->subcap - j * a < rm - EPS_DL)
+                  continue;
+#endif
                temp = (*rhs - lift->dplist[FLOOR_INT(lift->subcap - j*a)])/j;
             }
             if( temp < *alpha)
@@ -1186,6 +1206,15 @@ int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype 
          }
          else
          {
+#ifdef REDUCTION
+            double rm;
+            if(Lifting_reduction(lift, &rm))
+            {
+               int capj = FLOOR_INT(lift->subcap + j * a);
+               if(capj < Lifting_reduction_start(lift, 0))
+                  continue;
+            }
+#endif
             temp = (lift->dplist[FLOOR_INT(lift->subcap + j*a)] - *rhs)/j;
          }
          if( temp > *alpha)

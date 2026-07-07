@@ -1,8 +1,0 @@
-add_executable(example_basic example_basic.cpp)
-target_link_libraries(example_basic PRIVATE dllifting)
-
-add_executable(example_c_api example_c_api.c)
-target_link_libraries(example_c_api PRIVATE dllifting)
-
-add_executable(example_force_mode example_force_mode.cpp)
-target_link_libraries(example_force_mode PRIVATE dllifting)

@@ -47,17 +47,16 @@ dllifting_lift_cover(n, coef, weight, ub, use_ub,
     &rhs, is_leq, threshold, DLLIFTING_MODE_AUTO, x_frac);
 ```
 
-## CMake consumers
+## Build / install
 
-Re-install after upgrading:
+After upgrading, rebuild and install:
 
 ```bash
-cd build && cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/.local
-cmake --build . --target install
+make clean && make
+make install PREFIX=$HOME/.local
 ```
 
-`find_package(dllifting CONFIG REQUIRED)` remains unchanged; bump your dependency
-to `1.1.0` if you pin versions.
+Link with `-I$PREFIX/include -L$PREFIX/lib -ldllifting`.
 
 ## Behaviour changes (non-breaking if you pass `AUTO`)
 

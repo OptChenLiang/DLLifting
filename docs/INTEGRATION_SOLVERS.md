@@ -60,7 +60,7 @@ Use a **lazy constraint** or **user cut** callback (`CPXsetlazyconstraintcallbac
 4. Call `lifting()` or `dllifting_lift_cover()`.
 5. Add the cut with `CPXcutcallbackadd` / `CPXXcallbackaddusercuts`.
 
-Link: `libdllifting.a` + CPLEX libraries. No CPLEX header is required inside DLLifting itself.
+Link: `libdllifting.so` (or static link of `src/*.cpp`) + solver libraries. No solver header is required inside DLLifting itself.
 
 ## Gurobi
 
@@ -74,24 +74,25 @@ Use `GRBsetcallback` with `GRB_CB_MIPSOL` or `GRB_CB_MIPNODE`.
 
 Same pattern: fractional solution → separate → `lifting()` → add linear `<=` cut.
 
-## CMake consumer project
+## Linking
 
-```cmake
-find_package(dllifting CONFIG REQUIRED)
-target_link_libraries(my_separator PRIVATE dllifting::dllifting)
-target_include_directories(my_separator PRIVATE ${dllifting_INCLUDE_DIRS})
-```
-
-After install:
+Build and install the shared library:
 
 ```bash
-cd DLLifting && mkdir build && cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/.local
-cmake --build . --target install
+cd DLLifting
+make
+make install PREFIX=$HOME/.local
+```
+
+Link your separator:
+
+```bash
+g++ -O2 my_separator.cpp -I$HOME/.local/include -L$HOME/.local/lib \
+    -ldllifting -Wl,-rpath,'$HOME/.local/lib' -lm -o my_separator
 ```
 
 ## Notes
 
 - Cuts are always emitted as **`sum p_i x_i <= rhs`**; for `>=` knapsacks the lifting still produces a valid `<=` cutting plane for the covering set reformulation used here.
 - Set `u[i]` to a large value (e.g. `1e20`) for unbounded integers; items with `w*(u+1) > cap` are treated as unbounded internally.
-- Enable reduction at build time: `-DDLLIFTING_REDUCTION=ON` (default).
+- Enable reduction at build time: `make REDUCTION=1` (default).

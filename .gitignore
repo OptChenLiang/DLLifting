@@ -1,12 +1,12 @@
 build/
 *.o
 *.a
+*.so
+*.dylib
 test_dllifting
-test_dllifting_reduction
 test_isgeq
-test_mixed
 test_mixed_vars
 test_mixed_vars_r
+example
 results_mixed_*.txt
-examples/example_basic
-examples/example_c_api
+tests/results_mixed_*.txt
