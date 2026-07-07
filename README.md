@@ -20,10 +20,9 @@
 
 | Target | Command | What it does |
 | ------ | ------- | ------------ |
-| Library only | `make` | Compile sources and produce the shared library `libdllifting.so`. Does not build or run tests or examples. |
-| Unit tests | `make test` | Build `libdllifting.so` and run `test_dllifting` + `test_isgeq`. Fails if any test fails. |
-| Extended tests | `make test-all` | Run `make test` plus mixed-variable regression (`test_mixed_vars`, `test_mixed_vars_r`). |
-| Example program | `make example` | Build the `example` binary (see `examples/example.cpp`). Execute `./example` afterward. |
+| Library only | `make` | Compile sources and produce the shared library `libdllifting.so`. |
+| Unit tests | `make test` | Build and run the unified test suite (`tests/test_dllifting.cpp`). |
+| Example program | `make example` | Build the `example` binary. Execute `./example` afterward. |
 
 Compile-time reduction support is enabled by default (`REDUCTION=1`). To disable:
 
@@ -58,58 +57,93 @@ All public symbols are declared in `include/DLLifting.h`.
 
 ### `lifting` (C++)
 
-Full sequential lifting with prescribed seed and lifting order. See `include/DLLifting.h` for the complete signature and `Lifting` / `DLLifting` workspace type.
+Full sequential lifting with prescribed seed and lifting order. See `include/DLLifting.h`.
 
 ### `dllifting_lift_cover` (C)
 
-Stable C wrapper for solver callbacks:
-
-```c
-int dllifting_lift_cover(
-      int n, double* coef,
-      const double* weight, const double* ub, const int* use_ub,
-      double cap, int is_subcap,
-      const int* seed, int n_seed,
-      const int* lifting_order, int n_order,
-      double* rhs,
-      int is_leq, double threshold, int isdl_mode,
-      const double* x_frac);
-```
+Stable C wrapper for solver callbacks; see `include/DLLifting.h`.
 
 **Return value:** `DLLIFTING_OK` (0) on success; negative error code otherwise.
 
 ### Example
+
+Consider the knapsack set
+
+\[
+\mathcal{X}=\Big\{ \boldsymbol{x}\in\mathbb{Z}_+^5:\;
+8x_1+5x_2+4x_3+3x_4+5x_5\le 23,\;
+x_1\le 2,\; x_2\le 3,\; x_3\le 6,\; x_4\le 5,\; x_5\le 1 \Big\}.
+\]
+
+Let \(C=\{1,2\}\), \(N_0=\{3,4\}\), \(N_u=\{5\}\), and lift in the order \(\{3,4,5\}\).
+The seed inequality \(2x_1+x_2\le 4\) is valid on the restricted set
+
+\[
+\mathcal{X}(N_0,N_u)=\Big\{ \boldsymbol{x}\in\mathbb{Z}_+^5:\;
+8x_1+5x_2\le 18,\;
+x_1\le 2,\; x_2\le 3,\; x_3=0,\; x_4=0,\; x_5=1 \Big\},
+\]
+
+with \(N_0^2=\{3,4\}\), \(N_u^2=\{5\}\), \(b^2=18\), \(\beta^2=4\).
+
+**Input** (0-based indices in code: \(x_1\!\mapsto\!0,\ldots,x_5\!\mapsto\!4\))
+
+
+| Field | Value |
+| ----- | ----- |
+| `n` | 5 |
+| `weight` | `[8, 5, 4, 3, 5]` |
+| `coef` (seed) | `[2, 1, 0, 0, 0]` |
+| `ub` | `[2, 3, 6, 5, 1]` |
+| `isuseub` | `[0, 0, 0, 0, 1]` — \(N_u=\{x_5\}\): down-lift |
+| `capacity` | `18` (\(b^2\)) |
+| `is_subcap` | `1` |
+| `seed` | `[0, 1]` (\(x_1,x_2\)) |
+| `lifting_order` | `[2, 3, 4]` (\(x_3,x_4,x_5\)) |
+| `isdl_mode` | `DLLIFTING_MODE_DP` (integer weights) |
+
+**Output**
+
+
+| Field | Value |
+| ----- | ----- |
+| `coef` (lifted) | `[2, 1, 1, 0.5, 1.5]` |
+| `rhs` | `5.5` |
+
+Sequential lifting on \(\{x_3,x_4,x_5\}\): \(\alpha_3=1\), \(\alpha_4=\tfrac12\), \(\alpha_5=\tfrac32\).
 
 ```cpp
 #include <DLLifting.h>
 #include <cstdio>
 
 int main() {
-   const int n = 3;
-   double p[] = {1.0, 1.0, 0.0};
-   double w[] = {2.0, 3.0, 4.0};
-   double u[] = {1.0, 1.0, 1.0};
-   int isuseub[] = {0, 0, 0};
-   int seed[] = {0, 1};
-   int order[] = {2};
+   const int n = 5;
+   double p[] = {2.0, 1.0, 0.0, 0.0, 0.0};
+   double w[] = {8.0, 5.0, 4.0, 3.0, 5.0};
+   double u[] = {2.0, 3.0, 6.0, 5.0, 1.0};
+   int isuseub[] = {0, 0, 0, 0, 1};   /* N_u = {x5}: down-lift */
+   int seed[] = {0, 1};               /* C = {x1, x2} */
+   int order[] = {2, 3, 4};           /* lift x3, x4, x5 */
    double rhs = 0.0;
 
    DLLifting lift = {};
-   if (!lifting(&lift, p, w, u, isuseub, 4.0, 0, seed, 2, order, 1,
-            &rhs, 1, nullptr, n, 10.0, 0.0, DLLIFTING_MODE_AUTO))
+   if (!lifting(&lift, p, w, u, isuseub, 18.0, 1,
+            seed, 2, order, 3, &rhs, 1, nullptr, n,
+            10.0, 0.0, DLLIFTING_MODE_DP))
       return 1;
 
-   for (int i = 0; i < n; i++)
+   for (int i = 0; i < n; i++) {
       if (p[i] > EPS_DL)
          std::printf("%.4f*x_%d + ", p[i], i + 1);
+   }
    std::printf("<= %.4f  (%.4f s)\n", rhs, lift.duration);
    return 0;
 }
 ```
 
-More demos: `examples/example.cpp` (`make example && ./example`).
+The final cut is \(2x_1+x_2+x_3+\tfrac12 x_4+\tfrac32 x_5\le \tfrac{11}{2}\).
 
-Extended API notes, migration guide, and solver integration: see `docs/`.
+More demos: `examples/example.cpp` (`make example && ./example`).
 
 ## Project layout
 
@@ -120,8 +154,7 @@ dllifting/
 ├── src/dllifting_c.cpp   # C wrapper
 ├── libdllifting.so       # built by make (shared library)
 ├── examples/             # usage examples
-├── tests/                # unit and regression tests
-├── docs/                 # API, migration, integration notes
+├── tests/test_dllifting.cpp
 ├── Makefile
 └── LICENSE
 ```
