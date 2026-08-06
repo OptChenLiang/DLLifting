@@ -1875,5 +1875,8 @@ int main(int argc, char** argv)
    } else {
       printf("\n(Use ./test_dllifting --all or `make test-all` for mixed suite.)\n");
    }
-   return fail ? 1 : 0;
+   /* Exit code = total failure count (core + geq), capped at 255 for POSIX. */
+   if (fail <= 0)
+      return 0;
+   return fail > 255 ? 255 : fail;
 }

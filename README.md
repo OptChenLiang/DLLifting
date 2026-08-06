@@ -24,7 +24,7 @@
 | Target | Command | What it does |
 | ------ | ------- | ------------ |
 | Library | `make` | Build `libdllifting.so` |
-| Unit tests | `make test` | Core `<=` **and** `>=` suites; **any failure → nonzero exit** |
+| Unit tests | `make test` | Core `<=` **and** geq `>=`; exit code = failure count (e.g. 5 geq fails → exit 5) |
 | Extended tests | `make test-all` | Also mixed-variable suite |
 | Example | `make example` | Build `./example` (then run it) |
 

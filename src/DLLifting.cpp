@@ -94,19 +94,23 @@ static double Lifting_length(const DLLifting* lift, int i)
 #endif
 
 
-static DTctype Lifting_Geqcap(const DLLifting* lift, DTctype cap)
-{
-   if(cap < lift->minweight)
-      return lift->minweight;
-   return cap;
-}
-
+/* Min p-cost to cover residual demand `cap` on the current geq DP/DL table.
+ * Residual queries must NOT be clamped to the original RHS (minweight): that
+ * made Up-lifting see dp[b] for every b-ja < b and forced alpha=0. */
 static DTptype Lifting_Geqfind(DLLifting* lift, DTctype cap)
 {
-   DTctype qcap = Lifting_Geqcap(lift, cap);
+   if(cap <= 0)
+      return 0.0;
    if(lift->isDL)
       Lifting_Expand(lift);
-   return lift->dplist[FLOOR_INT(qcap)];
+   {
+      int q = FLOOR_INT(cap);
+      if(q < 0)
+         return 0.0;
+      if(q > (int)lift->cap)
+         q = (int)lift->cap;
+      return lift->dplist[q];
+   }
 }
 
 /* Expand -> DPiter(Inf) -> Compress -> Expand. */
