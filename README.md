@@ -167,7 +167,7 @@ dllifting/
 
 ## License
 
-MIT License — see [LICENSE](LICENSE). Based on work by Igor Vasilyev and contributors.
+MIT License — see [LICENSE](LICENSE). Copyright (c) 2026 Xintong Wang and contributors.
 
 ## Citation
 
