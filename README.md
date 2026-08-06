@@ -1,6 +1,6 @@
 # DLLifting
 
-**DLLifting** (v1.2.0) is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports optional capacity reduction (**DL-R** / **DP-R**) and can be embedded in MIP solvers via cut callbacks or custom separators.
+**DLLifting** (v1.2.1) is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports optional capacity reduction (**DL-R** / **DP-R**) and can be embedded in MIP solvers via cut callbacks or custom separators.
 
 ## Scope
 
@@ -24,8 +24,8 @@
 | Target | Command | What it does |
 | ------ | ------- | ------------ |
 | Library | `make` | Build `libdllifting.so` |
-| Unit tests (release gate) | `make test` | Core `<=` suite; **must pass** |
-| Extended tests | `make test-all` | Also `>=` and mixed suites |
+| Unit tests | `make test` | Core `<=` **and** `>=` suites; **any failure → nonzero exit** |
+| Extended tests | `make test-all` | Also mixed-variable suite |
 | Example | `make example` | Build `./example` (then run it) |
 
 ```bash
@@ -56,7 +56,7 @@ make install
 ## API
 
 Public header: `include/DLLifting.h` (optional shim: `dllifting_c.h`).  
-Version: `DLLIFTING_VERSION` (`"1.2.0"`).
+Version: `DLLIFTING_VERSION` (`"1.2.1"`).
 
 ### Lifting modes
 
@@ -70,25 +70,38 @@ Version: `DLLIFTING_VERSION` (`"1.2.0"`).
 
 ```cpp
 int lifting(
-      DLLifting* lift,          /* workspace; lift->duration set on success */
-      double* p,                /* in: seed coefs; out: lifted coefs */
-      double* w,                /* knapsack weights */
-      double* u,                /* variable upper bounds */
-      int* isuseub,             /* 1 = down-lift (fix at UB), 0 = up-lift */
-      double cap,               /* capacity / residual */
-      int isSubCap,             /* 1 if cap is residual subcapacity */
+      DLLifting* lift,
+      double* p, double* w, double* u, int* isuseub,
+      double cap, int isSubCap,
       int* seed, int n_seed,
       int* liftingorder, int n_liftingorder,
-      double* rhs,              /* out: lifted rhs */
-      int isLeq,                /* 1: <= knapsack; 0: >= (experimental) */
-      double* x,                /* optional fractional point; may be NULL */
-      int n,
-      double threshold,         /* used only if isdl_mode == AUTO */
-      double duration,          /* reserved / unused */
-      int isdl_mode);           /* AUTO / DL / DP */
+      double* rhs,
+      int isLeq, double* x, int n,
+      double threshold, double duration, int isdl_mode);
 ```
 
-**Return:** `1` on success, `0` on failure.
+| Parameter | Type | Direction | Meaning |
+| --------- | ---- | --------- | ------- |
+| `lift` | `DLLifting*` | in/out | Workspace; on success `lift->duration` holds CPU seconds |
+| `p` | `double*` | in/out | Seed coefficients in, lifted coefficients out (length `n`) |
+| `w` | `double*` | in | Knapsack weights \(a_j\) |
+| `u` | `double*` | in | Variable upper bounds |
+| `isuseub` | `int*` | in | Per variable: `1` = down-lift (fix at UB), `0` = up-lift |
+| `cap` | `double` | in | Capacity \(b\), or residual subcapacity if `isSubCap=1` |
+| `isSubCap` | `int` | in | `1` if `cap` is residual after fixing \(N_u\); else `0` |
+| `seed` | `int*` | in | Indices of seed (cover) variables |
+| `n_seed` | `int` | in | Length of `seed` |
+| `liftingorder` | `int*` | in | Remaining variables in lift order |
+| `n_liftingorder` | `int` | in | Length of `liftingorder` |
+| `rhs` | `double*` | out | Lifted inequality right-hand side |
+| `isLeq` | `int` | in | `1`: \(\sum w x \le b\); `0`: \(\sum w x \ge b\) (experimental) |
+| `x` | `double*` | in | Optional fractional point; may be `NULL` |
+| `n` | `int` | in | Number of variables |
+| `threshold` | `double` | in | Used only if `isdl_mode == AUTO`: `&lt;100` → DL, `&gt;100` → DP |
+| `duration` | `double` | in | Reserved / unused (timing goes to `lift->duration`) |
+| `isdl_mode` | `int` | in | `DLLIFTING_MODE_AUTO` / `_DL` / `_DP` |
+
+**Return:** `1` on success, `0` on failure (allocation or internal error).
 
 ### `dllifting_lift_cover` (C)
 
@@ -104,7 +117,7 @@ int dllifting_lift_cover(
       const double* x_frac);    /* may be NULL */
 ```
 
-**Return:** `DLLIFTING_OK` (0); `DLLIFTING_ERR_ALLOC` / `DLLIFTING_ERR_ARGS` on failure.
+**Return:** `DLLIFTING_OK` (0); `DLLIFTING_ERR_ARGS` / `DLLIFTING_ERR_ALLOC` / `DLLIFTING_ERR_INTERNAL` on failure.
 
 ### Example
 
@@ -204,5 +217,5 @@ If you use DLLifting in research, please cite your related knapsack lifting / se
 
 ```
 Xintong Wang et al. DLLifting: DL/DP hybrid lifting for knapsack cover inequalities.
-https://159.226.92.34:8000/wangxintong/dllifting (version 1.2.0).
+https://159.226.92.34:8000/wangxintong/dllifting (version 1.2.1).
 ```

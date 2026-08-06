@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.1] - 2026-08-06
+
+### Changed
+
+- `make test` always runs geq (`>=`) suite; its failures affect the process exit code.
+- Library: replace `assert` failure paths with `return 0` error codes in Up/Down/Lifting;
+  propagate failure from `lifting()`; C ABI returns `DLLIFTING_ERR_INTERNAL`.
+- Release builds keep `-DNDEBUG`; debug `printf` remains behind `DLLIFTING_DEBUG`.
+- README: full markdown parameter table for `lifting(...)`.
+
 ## [1.2.0] - 2026-08-06
 
 ### Changed

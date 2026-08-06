@@ -1860,20 +1860,20 @@ static int run_main() {
 int main(int argc, char** argv)
 {
    setvbuf(stdout, NULL, _IONBF, 0);
-   int run_all = 0;
+   int run_mixed = 0;
    for (int i = 1; i < argc; i++) {
       if (strcmp(argv[i], "--all") == 0)
-         run_all = 1;
+         run_mixed = 1;
    }
 
    int fail = core_tests::run_main();
-   if (run_all) {
-      printf("\n");
-      fail += geq_tests::run_main();
+   printf("\n");
+   fail += geq_tests::run_main();
+   if (run_mixed) {
       printf("\n");
       mixed_tests::run_main();
    } else {
-      printf("\n(Use ./test_dllifting --all or `make test-all` for >= / mixed suites.)\n");
+      printf("\n(Use ./test_dllifting --all or `make test-all` for mixed suite.)\n");
    }
    return fail ? 1 : 0;
 }

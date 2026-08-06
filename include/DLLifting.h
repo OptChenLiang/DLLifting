@@ -14,13 +14,12 @@
 
 #define DLLIFTING_VERSION_MAJOR 1
 #define DLLIFTING_VERSION_MINOR 2
-#define DLLIFTING_VERSION_PATCH 0
-#define DLLIFTING_VERSION "1.2.0"
+#define DLLIFTING_VERSION_PATCH 1
+#define DLLIFTING_VERSION "1.2.1"
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
 #include <stdlib.h>
-#include <assert.h>
 
 #ifndef DLLIFTING_API
 #  if defined(_WIN32) && defined(DLLIFTING_BUILD_SHARED)
@@ -239,6 +238,7 @@ extern "C" {
 #define DLLIFTING_OK           0
 #define DLLIFTING_ERR_ALLOC   -1
 #define DLLIFTING_ERR_ARGS    -2
+#define DLLIFTING_ERR_INTERNAL -3
 
 /**
  * Lift a cover inequality for a single knapsack row (C ABI).

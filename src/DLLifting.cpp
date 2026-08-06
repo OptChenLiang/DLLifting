@@ -282,8 +282,8 @@ void Lifting_Check(DLLifting* lift)
    int i = 0;
    for(i = 1; i<lift->n_soltable; i++)
    {
-      assert(ISLT(lift->wsum[i-1], lift->wsum[i]));
-      assert(ISLT(lift->psum[i-1], lift->psum[i]));
+      if(!ISLT(lift->wsum[i-1], lift->wsum[i]) || !ISLT(lift->psum[i-1], lift->psum[i]))
+         return;
    }
 }
 
@@ -1110,8 +1110,6 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
 {
    int solind = -1, j = 1, u0;
    double temp;
-   bool iszero = 1;
-   double w0;
    if(lift->isleq)
    {
       *alpha = INF_DL; 
@@ -1133,7 +1131,8 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
 #ifdef DLTIME
                findtime += Lifting_GetTime() - tmp;
 #endif
-               assert(solind >= 0);
+               if(solind < 0)
+                  return 0;
                temp = (*rhs - lift->psum[solind])/j;
 
             }
@@ -1155,21 +1154,24 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
 
       if( ISZERO(*alpha) )
          *alpha = 0;
-      assert( *alpha >= 0 && *alpha < INF_DL/10);
+      if(!(*alpha >= 0 && *alpha < INF_DL/10))
+         return 0;
       Lifting_Iter(lift, *alpha, a, u);
    }
    else
    {
       *alpha = 0; 
       u0 = CEIL_INT( MIN_DL( u, lift->subcap*1.0/a) ); 
-      assert(u0 > 0);
+      if(u0 <= 0)
+         return 0;
       for( j = 1; j<=u0; j++)
       {
          temp = (*rhs - Lifting_Geqfind(lift, lift->subcap - j*a))/j;
          if( temp > *alpha)
             *alpha = temp;
       }
-      assert(*alpha >= 0 && *alpha < INF_DL/10);
+      if(!(*alpha >= 0 && *alpha < INF_DL/10))
+         return 0;
       if(!ISZERO(*alpha))
          Lifting_Iter(lift, *alpha, a, u); 
    }
@@ -1186,7 +1188,8 @@ int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype 
       *alpha = -INF_DL; 
       u0 = CEIL_INT( MIN_DL( u, (lift->cap - lift->subcap)*1.0/a) ); 
       solind = 0;
-      assert(u0 > 0);
+      if(u0 <= 0)
+         return 0;
 
       for( j = 1; j<=u0; j++)
       {
@@ -1199,7 +1202,8 @@ int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype 
 #ifdef DLTIME
             findtime += Lifting_GetTime() - tmp;
 #endif
-            assert(solind >= 0);
+            if(solind < 0)
+               return 0;
             temp = (lift->psum[solind] - *rhs)/j;
          }
          else
@@ -1221,7 +1225,8 @@ int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype 
       lift->subcap = lift->subcap + a*u;
       *rhs = *rhs + *alpha*u;
 
-      assert(*alpha >= 0 && *alpha < INF_DL/10);
+      if(!(*alpha >= 0 && *alpha < INF_DL/10))
+         return 0;
       Lifting_Multiply(lift, *alpha, a, u); 
    }
    else
@@ -1248,7 +1253,8 @@ int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype 
       }
       lift->subcap = lift->subcap + a*u;
       *rhs = *rhs + *alpha*u;
-      assert(*alpha >= 0 && *alpha < INF_DL/10);
+      if(!(*alpha >= 0 && *alpha < INF_DL/10))
+         return 0;
       if(!ISZERO(*alpha))
          Lifting_Multiply(lift, *alpha, a, u); 
    }
@@ -1329,29 +1335,28 @@ int Lifting_Expand(DLLifting* lift)
 int Lifting_Lifting(DLLifting* lift, DTptype* rhs)
 {
    int i = 0;
-   int has_nonzero_lifting = 0;
    for( i = 0; i<lift->n_liftingorder; i++)
    {
-
-      int var_idx = lift->liftingorder[i];
-
-       DTptype old_p = lift->p[var_idx]; 
-
       if(lift->isuseub[lift->liftingorder[i]] == 0)  
       {
-         Lifting_Up(lift, &lift->p[lift->liftingorder[i]], lift->w[lift->liftingorder[i]], lift->u[lift->liftingorder[i]], rhs);
+         if(!Lifting_Up(lift, &lift->p[lift->liftingorder[i]],
+               lift->w[lift->liftingorder[i]], lift->u[lift->liftingorder[i]], rhs))
+            return 0;
 #ifdef REDUCTION 
          if(lift->reduction_active)
             lift->tableleft -= Lifting_length(lift, lift->liftingorder[i]);
 #endif
-         assert(ISGE(lift->p[lift->liftingorder[i]],0));
+         if(!ISGE(lift->p[lift->liftingorder[i]], 0))
+            return 0;
       }
       else
       {
-         Lifting_Down(lift, &lift->p[lift->liftingorder[i]], lift->w[lift->liftingorder[i]], lift->u[lift->liftingorder[i]], rhs);
-         assert(ISGE(lift->p[lift->liftingorder[i]],0));
+         if(!Lifting_Down(lift, &lift->p[lift->liftingorder[i]],
+               lift->w[lift->liftingorder[i]], lift->u[lift->liftingorder[i]], rhs))
+            return 0;
+         if(!ISGE(lift->p[lift->liftingorder[i]], 0))
+            return 0;
       }
-      DTptype new_p = lift->p[var_idx];
    }
    return 1;
 }
@@ -1415,7 +1420,11 @@ int lifting(
 
    clock_t startTime = clock();
    lift->rhs = Lifting_Calinitrhs(lift);
-   Lifting_Lifting(lift, &lift->rhs);
+   if(!Lifting_Lifting(lift, &lift->rhs))
+   {
+      Lifting_Free(lift);
+      return 0;
+   }
    clock_t endTime = clock();
 
    lift->duration  = (double) (endTime - startTime) / CLOCKS_PER_SEC;
@@ -1530,7 +1539,7 @@ int dllifting_lift_cover(
    delete[] w;
 
    if(!ok)
-      return DLLIFTING_ERR_ALLOC;
+      return DLLIFTING_ERR_INTERNAL;
 
    *rhs = rhs_val;
    return DLLIFTING_OK;

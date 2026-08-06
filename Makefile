@@ -34,11 +34,11 @@ example: examples/example.cpp $(LIB)
 
 examples: example
 
-# Default gate: core (<=) suite only — must pass for release.
+# Default gate: core (<=) + geq (>=); both failures affect exit code.
 test: test_dllifting
 	./test_dllifting
 
-# Extended: also run >= and mixed suites (geq may report known failures).
+# Also run mixed-variable benchmark suite.
 test-all: test_dllifting
 	./test_dllifting --all
 
