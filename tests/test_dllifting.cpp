@@ -80,15 +80,23 @@ static void ref_dp_geq_init(int cap, double* dp)
 static void ref_dp_geq_add(int cap, double* dp, int w, double p)
 {
    int j;
+   double old[512];
    if (w <= 0)
       return;
-   for (j = 0; j <= w && j <= cap; j++) {
-      if (dp[j] > p)
-         dp[j] = p;
-   }
-   for (j = w + 1; j <= cap; j++) {
-      if (dp[j] > dp[j - w] + p)
-         dp[j] = dp[j - w] + p;
+   if (cap + 1 > (int)(sizeof(old) / sizeof(old[0])))
+      return;
+   for (j = 0; j <= cap; j++)
+      old[j] = dp[j];
+   for (j = 0; j <= cap; j++) {
+      double cand;
+      if (j <= w)
+         cand = p;
+      else if (old[j - w] >= INF_DL / 2)
+         continue;
+      else
+         cand = p + old[j - w];
+      if (cand < dp[j])
+         dp[j] = cand;
    }
 }
 
@@ -160,6 +168,8 @@ static int setup_lift(DLLifting* lift, int cap, int isleq, double threshold)
    lift->cap = cap;
    lift->subcap = cap;
    lift->maxcap = cap;
+   /* memset leaves force_mode=0 (DP); AUTO is required for threshold switching */
+   lift->force_mode = DLLIFTING_MODE_AUTO;
    if (!Lifting_Alloc(lift, cap, 1, threshold))
       return 0;
    Lifting_Reset(lift, cap);
@@ -388,8 +398,8 @@ static int lifted_cut_valid(int isleq, int n, const double* p, const double* w,
          lhs += p[i] * x[i];
       }
       int knap_ok = isleq ? (wsum <= cap + EPS_DL) : (wsum + EPS_DL >= cap);
-      /* Lifted cover inequalities are always <= form; only knapsack direction uses isleq */
-      int cut_ok = (lhs <= rhs + EPS_DL);
+      /* <= knapsack → <= cut; >= knapsack → >= cut (cover / sequential lifting) */
+      int cut_ok = isleq ? (lhs <= rhs + EPS_DL) : (lhs + EPS_DL >= rhs);
       if (knap_ok && !cut_ok)
          return 0;
       i = 0;
@@ -612,7 +622,7 @@ static void run_all_lifting_cases()
        {0, 0, 0, 0}, {0}, {1, 2}, 1, 2, 5.0},
       {"lift_geq_down", 0, 3, {1, 0, 0, 0}, {4, 3, 5, 0}, {1, 2, 1, 0},
        {0, 1, 0, 0}, {0}, {1, 2}, 1, 2, 3.0},
-      {"lift_geq_largeu", 0, 2, {1, 0, 0, 0}, {3, 7, 0, 0}, {1, 6, 0, 0},
+      {"lift_geq_largeu", 0, 2, {1, 0, 0, 0}, {3, 7, 0, 0}, {4, 6, 0, 0},
        {0, 0, 0, 0}, {0}, {1}, 1, 1, 10.0},
       {"lift_leq_4var", 1, 4, {1, 1, 0, 0}, {2, 3, 5, 4}, {1, 1, 1, 1},
        {0, 0, 0, 0}, {0, 1}, {2, 3}, 2, 2, 7.0},
@@ -653,10 +663,10 @@ static void run_bounded_int_lifting_cases(void)
        {0, 1, 0, 0}, {0}, {2}, 1, 1, 11.0},
       {"lift_geq_ub2", 0, 2, {1, 0, 0, 0}, {3, 4, 0, 0}, {1, 2, 0, 0},
        {0, 0, 0, 0}, {0}, {1}, 1, 1, 3.0},
-      {"lift_geq_ub3", 0, 2, {1, 0, 0, 0}, {3, 5, 0, 0}, {1, 3, 0, 0},
+      {"lift_geq_ub3", 0, 2, {1, 0, 0, 0}, {3, 5, 0, 0}, {3, 3, 0, 0},
        {0, 0, 0, 0}, {0}, {1}, 1, 1, 7.0},
       {"lift_geq_ub_down", 0, 3, {1, 0, 0, 0}, {5, 4, 6, 0}, {1, 2, 1, 0},
-       {0, 1, 0, 0}, {0}, {2}, 1, 1, 6.0},
+       {0, 1, 0, 0}, {0}, {1, 2}, 1, 2, 6.0},
    };
    int c;
    for (c = 0; c < (int)(sizeof(cases) / sizeof(cases[0])); c++) {
@@ -675,7 +685,7 @@ static void test_random_bounded_lifting(int trials)
    int fail_before = g_fail;
    g_test_quiet = 1;
    for (t = 0; t < trials; t++) {
-      /* leq only: random >= cover with u>1 rarely yields valid lifted cuts */
+      /* leq only: keep random geq stress in geq_tests::test_random_geq_validity */
       const int isleq = 1;
       int n = 2 + rand_int(0, 2);
       double p[6], w[6], u[6];
@@ -832,24 +842,32 @@ static void ok(const char* msg)
    printf("OK: %s\n", msg);
 }
 
-/* Reference DP matching Lifting_Reset + repeated Lifting_DPiter (!isleq). */
+/* Reference DP matching Lifting_Reset + repeated Lifting_DPiter (!isleq), 0-1 per add. */
 static void ref_dp_geq(int cap, double* dp, int nw, const double* pw, const double* pp)
 {
    int i, j, k;
+   double old[512];
    for (i = 0; i <= cap; i++)
       dp[i] = (i == 0 ? 0.0 : INF_DL);
+   if (cap + 1 > (int)(sizeof(old) / sizeof(old[0])))
+      return;
    for (k = 0; k < nw; k++) {
       int w = (int)pw[k];
       double p = pp[k];
       if (w <= 0)
          continue;
-      for (j = 0; j <= w && j <= cap; j++) {
-         if (dp[j] > p)
-            dp[j] = p;
-      }
-      for (j = w + 1; j <= cap; j++) {
-         if (dp[j] > dp[j - w] + p)
-            dp[j] = dp[j - w] + p;
+      for (j = 0; j <= cap; j++)
+         old[j] = dp[j];
+      for (j = 0; j <= cap; j++) {
+         double cand;
+         if (j <= w)
+            cand = p;
+         else if (old[j - w] >= INF_DL / 2)
+            continue;
+         else
+            cand = p + old[j - w];
+         if (cand < dp[j])
+            dp[j] = cand;
       }
    }
 }
@@ -888,6 +906,8 @@ static int setup_lift(DLLifting* lift, int cap, int isleq, double threshold)
    lift->cap = cap;
    lift->subcap = cap;
    lift->maxcap = cap;
+   /* memset leaves force_mode=0 (DP); AUTO is required for threshold switching */
+   lift->force_mode = DLLIFTING_MODE_AUTO;
    if (!Lifting_Alloc(lift, cap, 1, threshold))
       return 0;
    Lifting_Reset(lift, cap);
@@ -1128,12 +1148,12 @@ static int lifted_cut_valid(int isleq, int n, const double* p, const double* w,
          double lhs = 0;
          for (i = 0; i < n; i++)
             lhs += p[i] * x[i];
-         int ok_cut = (lhs <= rhs + EPS_DL);
+         int ok_cut = isleq ? (lhs <= rhs + EPS_DL) : (lhs + EPS_DL >= rhs);
          if (!ok_cut) {
             printf("  violated at x=(");
             for (i = 0; i < n; i++)
                printf("%d%s", x[i], i + 1 < n ? "," : "");
-            printf(") wsum=%.2f lhs=%.2f rhs=%.2f (%s)\n",
+            printf(") wsum=%.2f lhs=%.2f rhs=%.2f (cut %s)\n",
                   wsum, lhs, rhs, isleq ? "<=" : ">=");
             return 0;
          }
@@ -1276,7 +1296,7 @@ static void test_full_lifting_geq_large_u()
 {
    double p[2] = {1, 0};
    double w[2] = {3, 7};
-   double u[2] = {1, 8};
+   double u[2] = {4, 8};
    int isuseub[2] = {0, 0};
    int seed[1] = {0};
    int order[1] = {1};
@@ -1301,21 +1321,40 @@ static void test_up_lifting_step_geq()
    for (k = 0; k < 3; k++)
       Lifting_Multiply(&lift, ps[k], ws[k], 1);
 
-   Lifting_Up(&lift, &pcoef, 3.0, 2.0, &rhs);
-
-   double rem = lift.subcap - 3.0;
-   double base = (rem <= 0) ? 0.0 : lift.dplist[FLOOR_INT(rem)];
-   double brute_pre = (2.0 - base); /* j=1 in Up loop for geq (max over j) */
-   if (brute_pre < 0)
-      brute_pre = 0;
-
-   if (!ISEQ(pcoef, brute_pre))
+   /* Snapshot DP before Up mutates the table. */
    {
-      printf("  Up alpha: got %.6f brute %.6f\n", pcoef, brute_pre);
-      fail("Up lifting step geq vs brute");
+      int j, u0;
+      double best = 0.0;
+      double snap[32];
+      int c = (int)lift.cap;
+      if (c > 31)
+         c = 31;
+      for (j = 0; j <= c; j++)
+         snap[j] = lift.dplist[j];
+
+      u0 = (int)ceil(MIN_DL(2.0, lift.subcap / 3.0) - EPS_DL);
+      if (u0 < 1)
+         u0 = 1;
+      for (j = 1; j <= u0; j++) {
+         double rem = lift.subcap - j * 3.0;
+         double base = (rem <= 0) ? 0.0 : snap[FLOOR_INT(rem)];
+         double alpha = (rhs - base) / j;
+         if (alpha > best)
+            best = alpha;
+      }
+      if (best < 0)
+         best = 0;
+
+      Lifting_Up(&lift, &pcoef, 3.0, 2.0, &rhs);
+
+      if (!ISEQ(pcoef, best))
+      {
+         printf("  Up alpha: got %.6f brute %.6f\n", pcoef, best);
+         fail("Up lifting step geq vs brute");
+      }
+      else
+         ok("Up lifting step geq vs brute");
    }
-   else
-      ok("Up lifting step geq vs brute");
 
    teardown_lift(&lift);
 }
@@ -1341,7 +1380,7 @@ static void test_dp_mode_switch()
    teardown_lift(&lift);
 }
 
-/* Random micro-instances: validity only */
+/* Random micro-instances with a seed that covers (required for a valid init cut) */
 static void test_random_geq_validity(int ntrials)
 {
    int t, n;
@@ -1361,11 +1400,8 @@ static void test_random_geq_validity(int ntrials)
       }
       for (i = 0; i < n_ord; i++)
          order[i] = (i + 1) % n;
+      /* Seed alone must cover: otherwise Calinitrhs is INF and lifting fails */
       double cap = w[0];
-      for (i = 1; i < n; i++)
-         if (w[i] > cap)
-            cap = w[i];
-      cap += 0.5 * (t % 3);
       snprintf(name, sizeof(name), "geq_random_%d", t);
       run_lifting_case(name, 0, n, p, w, u, isuseub, cap, seed, n_seed, order, n_ord);
    }

@@ -14,8 +14,8 @@
 
 #define DLLIFTING_VERSION_MAJOR 1
 #define DLLIFTING_VERSION_MINOR 2
-#define DLLIFTING_VERSION_PATCH 1
-#define DLLIFTING_VERSION "1.2.1"
+#define DLLIFTING_VERSION_PATCH 2
+#define DLLIFTING_VERSION "1.2.2"
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
@@ -141,7 +141,9 @@ typedef struct DLLifting
    int                isDL;             // 1: DL table is authoritative; 0: dplist is */
 
    double             threshold;       // < 100: prefer DL; > 100: prefer DP */
-   double             duration;
+   double             duration;        // measured CPU seconds (set by lifting())
+   double             time_limit;      // optional limit in seconds; <=0 means unlimited
+   double             t_start;         // Lifting_GetTime() when lifting() starts
 } Lifting;
 
 /** Same type as @c Lifting (struct tag @c DLLifting). */
@@ -197,7 +199,8 @@ int Lifting_Lifting(DLLifting* lift, DTptype* rhs);
  * @param liftingorder  Remaining variables in lifting order
  * @param isLeq    1 for <= knapsack; 0 for >= knapsack
  * @param threshold  < 100 uses DL; > 100 uses DP (when isdl_mode = DLLIFTING_MODE_AUTO)
- * @param duration   Reserved; unused (timing is written to lift->duration)
+ * @param duration   Optional time limit in seconds; <= 0 means unlimited.
+ *                   Measured runtime is written to lift->duration.
  * @param isdl_mode  DLLIFTING_MODE_AUTO / _DP / _DL — force table without switching
  * @return 1 on success; writes lifted coefficients into p and rhs.
  */

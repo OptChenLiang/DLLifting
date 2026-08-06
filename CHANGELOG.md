@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.2] - 2026-08-06
+
+### Changed
+
+- `duration` argument to `lifting()` is now an optional **time limit** (seconds):
+  `<= 0` means unlimited; if the limit is exceeded during sequential lifting, `lifting()` returns 0.
+  Measured runtime is still written to `lift->duration`.
+- Cleared library `-Wall` unused-parameter/variable warnings.
+
 ## [1.2.1] - 2026-08-06
 
 ### Changed

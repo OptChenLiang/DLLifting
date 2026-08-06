@@ -1,6 +1,6 @@
 # DLLifting
 
-**DLLifting** (v1.2.1) is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports optional capacity reduction (**DL-R** / **DP-R**) and can be embedded in MIP solvers via cut callbacks or custom separators.
+**DLLifting** (v1.2.2) is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports optional capacity reduction (**DL-R** / **DP-R**) and can be embedded in MIP solvers via cut callbacks or custom separators.
 
 ## Scope
 
@@ -11,8 +11,8 @@
 - Preferred API: C++ `lifting()`, C ABI `dllifting_lift_cover()`
 - No dependency on external optimization libraries
 
-**Maturity:** `sum w x <= b` (`is_leq = 1`) is the supported / tested path (`make test`).  
-`sum w x >= b` (`is_leq = 0`) is **experimental** — extended checks via `make test-all` may still report failures.
+**Maturity:** `sum w x <= b` (`is_leq = 1`) is the primary / production path.  
+`sum w x >= b` (`is_leq = 0`) produces **≥ cover inequalities** via sequential lifting; covered by `make test` / `make test-all`.
 
 ## Requirements
 
@@ -56,7 +56,7 @@ make install
 ## API
 
 Public header: `include/DLLifting.h` (optional shim: `dllifting_c.h`).  
-Version: `DLLIFTING_VERSION` (`"1.2.1"`).
+Version: `DLLIFTING_VERSION` (`"1.2.2"`).
 
 ### Lifting modes
 
@@ -98,7 +98,7 @@ int lifting(
 | `x` | `double*` | in | Optional fractional point; may be `NULL` |
 | `n` | `int` | in | Number of variables |
 | `threshold` | `double` | in | Used only if `isdl_mode == AUTO`: `&lt;100` → DL, `&gt;100` → DP |
-| `duration` | `double` | in | Reserved / unused (timing goes to `lift->duration`) |
+| `duration` | `double` | in | Optional time limit (seconds); `<= 0` = unlimited. Elapsed time is written to `lift->duration` |
 | `isdl_mode` | `int` | in | `DLLIFTING_MODE_AUTO` / `_DL` / `_DP` |
 
 **Return:** `1` on success, `0` on failure (allocation or internal error).
@@ -217,5 +217,5 @@ If you use DLLifting in research, please cite your related knapsack lifting / se
 
 ```
 Xintong Wang et al. DLLifting: DL/DP hybrid lifting for knapsack cover inequalities.
-https://159.226.92.34:8000/wangxintong/dllifting (version 1.2.1).
+https://159.226.92.34:8000/wangxintong/dllifting (version 1.2.2).
 ```
