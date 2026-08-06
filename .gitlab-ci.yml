@@ -1,0 +1,17 @@
+# Minimal CI for DLLifting (GitLab)
+stages:
+  - build
+
+build_and_test:
+  stage: build
+  image: gcc:11
+  script:
+    - make clean
+    - make
+    - make test
+    - make example
+    - ./example
+  artifacts:
+    paths:
+      - libdllifting.so
+    expire_in: 1 week

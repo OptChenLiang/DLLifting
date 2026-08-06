@@ -1,6 +1,6 @@
 # DLLifting
 
-**DLLifting** is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports both `<=` and `>=` knapsack rows, optional capacity reduction (**DP-R** / **DL-R**), and can be embedded in MIP solvers via cut callbacks or custom separators.
+**DLLifting** (v1.2.0) is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports optional capacity reduction (**DL-R** / **DP-R**) and can be embedded in MIP solvers via cut callbacks or custom separators.
 
 ## Scope
 
@@ -8,66 +8,103 @@
 - Sequential up/down lifting with hybrid **DL** / **DP** subproblem solvers
 - Forced modes **DL**, **DP**, or threshold-based **AUTO** switching
 - Optional reduction variants **DL-R** / **DP-R** (compile-time `REDUCTION=1`)
-- Stable C ABI (`dllifting_lift_cover`) and full C++ API (`lifting`)
+- Preferred API: C++ `lifting()`, C ABI `dllifting_lift_cover()`
 - No dependency on external optimization libraries
+
+**Maturity:** `sum w x <= b` (`is_leq = 1`) is the supported / tested path (`make test`).  
+`sum w x >= b` (`is_leq = 0`) is **experimental** — extended checks via `make test-all` may still report failures.
 
 ## Requirements
 
-- C++11 compiler (GCC, Clang, or MSVC)
+- C++11 compiler (GCC or Clang; MSVC untested)
 - GNU Make
 
 ## Build
 
 | Target | Command | What it does |
 | ------ | ------- | ------------ |
-| Library only | `make` | Compile sources and produce the shared library `libdllifting.so`. |
-| Unit tests | `make test` | Build and run the unified test suite (`tests/test_dllifting.cpp`). |
-| Example program | `make example` | Build the `example` binary. Execute `./example` afterward. |
-
-Compile-time reduction support is enabled by default (`REDUCTION=1`). To disable:
+| Library | `make` | Build `libdllifting.so` |
+| Unit tests (release gate) | `make test` | Core `<=` suite; **must pass** |
+| Extended tests | `make test-all` | Also `>=` and mixed suites |
+| Example | `make example` | Build `./example` (then run it) |
 
 ```bash
-make REDUCTION=0
-make test REDUCTION=0
+make
+make test
+make example && ./example
 ```
 
-Link your own program against the shared library:
+Disable reduction:
+
+```bash
+make clean && make REDUCTION=0 && make test REDUCTION=0
+```
+
+Link your program:
 
 ```bash
 g++ -O2 my_app.cpp -Iinclude -L. -ldllifting -Wl,-rpath,'$ORIGIN' -lm -o my_app
 ```
 
-Install headers and the shared library (optional):
+Install (default `PREFIX=$HOME/.local`):
 
 ```bash
-make install PREFIX=$HOME/.local
+make install
+# or: make install PREFIX=/usr/local
 ```
 
 ## API
 
-All public symbols are declared in `include/DLLifting.h`.
+Public header: `include/DLLifting.h` (optional shim: `dllifting_c.h`).  
+Version: `DLLIFTING_VERSION` (`"1.2.0"`).
 
 ### Lifting modes
 
 | Constant | Effect |
 | -------- | ------ |
-| `DLLIFTING_MODE_AUTO` | Use `threshold` to choose DL/DP (`&lt; 100` → DL, `&gt; 100` → DP); may switch on bounded items |
-| `DLLIFTING_MODE_DL` | Force DL table; `threshold` ignored |
-| `DLLIFTING_MODE_DP` | Force DP table; `threshold` ignored |
+| `DLLIFTING_MODE_AUTO` | Use `threshold` (`< 100` → DL, `> 100` → DP); may switch on bounded items |
+| `DLLIFTING_MODE_DL` | Force DL; `threshold` ignored |
+| `DLLIFTING_MODE_DP` | Force DP; `threshold` ignored |
 
 ### `lifting` (C++)
 
-Full sequential lifting with prescribed seed and lifting order. See `include/DLLifting.h`.
+```cpp
+int lifting(
+      DLLifting* lift,          /* workspace; lift->duration set on success */
+      double* p,                /* in: seed coefs; out: lifted coefs */
+      double* w,                /* knapsack weights */
+      double* u,                /* variable upper bounds */
+      int* isuseub,             /* 1 = down-lift (fix at UB), 0 = up-lift */
+      double cap,               /* capacity / residual */
+      int isSubCap,             /* 1 if cap is residual subcapacity */
+      int* seed, int n_seed,
+      int* liftingorder, int n_liftingorder,
+      double* rhs,              /* out: lifted rhs */
+      int isLeq,                /* 1: <= knapsack; 0: >= (experimental) */
+      double* x,                /* optional fractional point; may be NULL */
+      int n,
+      double threshold,         /* used only if isdl_mode == AUTO */
+      double duration,          /* reserved / unused */
+      int isdl_mode);           /* AUTO / DL / DP */
+```
 
-Trailing parameters: `threshold`, `duration`, `isdl_mode`.
+**Return:** `1` on success, `0` on failure.
 
 ### `dllifting_lift_cover` (C)
 
-Stable C wrapper for solver callbacks; see `include/DLLifting.h`.
+```c
+int dllifting_lift_cover(
+      int n, double* coef,
+      const double* weight, const double* ub, const int* use_ub,
+      double cap, int is_subcap,
+      const int* seed, int n_seed,
+      const int* lifting_order, int n_order,
+      double* rhs,
+      int is_leq, double threshold, int isdl_mode,
+      const double* x_frac);    /* may be NULL */
+```
 
-Parameters include `threshold` and `isdl_mode` (same meaning as in `lifting()`).
-
-**Return value:** `DLLIFTING_OK` (0) on success; negative error code otherwise.
+**Return:** `DLLIFTING_OK` (0); `DLLIFTING_ERR_ALLOC` / `DLLIFTING_ERR_ARGS` on failure.
 
 ### Example
 
@@ -90,8 +127,7 @@ x_1\le 2,\; x_2\le 3,\; x_3=0,\; x_4=0,\; x_5=1 \Big\},
 
 with \(N_0^2=\{3,4\}\), \(N_u^2=\{5\}\), \(b^2=18\), \(\beta^2=4\).
 
-**Input** (0-based indices in code: \(x_1\!\mapsto\!0,\ldots,x_5\!\mapsto\!4\))
-
+**Input** (0-based indices: \(x_1\!\mapsto\!0,\ldots,x_5\!\mapsto\!4\))
 
 | Field | Value |
 | ----- | ----- |
@@ -102,20 +138,13 @@ with \(N_0^2=\{3,4\}\), \(N_u^2=\{5\}\), \(b^2=18\), \(\beta^2=4\).
 | `isuseub` | `[0, 0, 0, 0, 1]` — \(N_u=\{x_5\}\): down-lift |
 | `capacity` | `18` (\(b^2\)) |
 | `is_subcap` | `1` |
-| `seed` | `[0, 1]` (\(x_1,x_2\)) |
-| `lifting_order` | `[2, 3, 4]` (\(x_3,x_4,x_5\)) |
-| `threshold` | `10.0` — under `AUTO`: `&lt;100` → DL, `&gt;100` → DP; ignored if mode is `DL`/`DP` |
-| `isdl_mode` | `DLLIFTING_MODE_DP` (force DP; integer weights) |
+| `seed` | `[0, 1]` |
+| `lifting_order` | `[2, 3, 4]` |
+| `threshold` | `10.0` — under `AUTO`: `<100` → DL, `>100` → DP; ignored if mode is `DL`/`DP` |
+| `isdl_mode` | `DLLIFTING_MODE_DP` |
 
-**Output**
-
-
-| Field | Value |
-| ----- | ----- |
-| `coef` (lifted) | `[2, 1, 1, 0.5, 1.5]` |
-| `rhs` | `5.5` |
-
-Sequential lifting on \(\{x_3,x_4,x_5\}\): \(\alpha_3=1\), \(\alpha_4=\tfrac12\), \(\alpha_5=\tfrac32\).
+**Output:** coef `[2, 1, 1, 0.5, 1.5]`, rhs `5.5`  
+(i.e. \(2x_1+x_2+x_3+\tfrac12 x_4+\tfrac32 x_5\le \tfrac{11}{2}\)).
 
 ```cpp
 #include <DLLifting.h>
@@ -126,9 +155,9 @@ int main() {
    double p[] = {2.0, 1.0, 0.0, 0.0, 0.0};
    double w[] = {8.0, 5.0, 4.0, 3.0, 5.0};
    double u[] = {2.0, 3.0, 6.0, 5.0, 1.0};
-   int isuseub[] = {0, 0, 0, 0, 1};   /* N_u = {x5}: down-lift */
-   int seed[] = {0, 1};               /* C = {x1, x2} */
-   int order[] = {2, 3, 4};           /* lift x3, x4, x5 */
+   int isuseub[] = {0, 0, 0, 0, 1};
+   int seed[] = {0, 1};
+   int order[] = {2, 3, 4};
    double rhs = 0.0;
 
    DLLifting lift = {};
@@ -146,27 +175,22 @@ int main() {
 }
 ```
 
-The final cut is \(2x_1+x_2+x_3+\tfrac12 x_4+\tfrac32 x_5\le \tfrac{11}{2}\).
-
-Run this example:
-
 ```bash
-make
-make example && ./example
+make && make example && ./example
 ```
-
-Expected cut: \(2x_1+x_2+x_3+\tfrac12 x_4+\tfrac32 x_5\le \tfrac{11}{2}\).
 
 ## Project layout
 
 ```
 dllifting/
-├── include/DLLifting.h   # public header (C++ + C ABI)
-├── src/DLLifting.cpp     # lifting + C wrapper (single translation unit)
-├── libdllifting.so       # built by make (shared library)
-├── examples/example.cpp  # README 5-var instance
+├── include/DLLifting.h      # public header (C++ + C ABI)
+├── include/dllifting_c.h    # compatibility include
+├── src/DLLifting.cpp        # single translation unit
+├── examples/example.cpp
 ├── tests/test_dllifting.cpp
 ├── Makefile
+├── CHANGELOG.md
+├── .gitlab-ci.yml
 └── LICENSE
 ```
 
@@ -176,4 +200,9 @@ MIT License — see [LICENSE](LICENSE). Copyright (c) 2026 Xintong Wang and cont
 
 ## Citation
 
-If you use DLLifting in research, please cite the associated knapsack lifting / separation work from your publication and link to this repository.
+If you use DLLifting in research, please cite your related knapsack lifting / separation paper and this repository:
+
+```
+Xintong Wang et al. DLLifting: DL/DP hybrid lifting for knapsack cover inequalities.
+https://159.226.92.34:8000/wangxintong/dllifting (version 1.2.0).
+```

@@ -2,15 +2,20 @@
  * @file DLLifting.h
  * @brief DL / DP hybrid lifting for knapsack sets.
  *
- * Implements coefficient lifting for inequalities of the form
- *   sum_i p_i x_i <= rhs
- * subject to a knapsack constraint sum_i w_i x_i <= b (isleq = 1) or
- * sum_i w_i x_i >= b (isleq = 0).  
- * Subproblems are solved either by DL (threshold < 100) or by a DP (threshold > 100). 
+ * Preferred public entry points:
+ *   - lifting()              (C++)
+ *   - dllifting_lift_cover() (C ABI)
+ * Other Lifting_* symbols are internal helpers exposed for advanced use / tests.
+ *
+ * Version: see DLLIFTING_VERSION.
  */
 #ifndef __DLLIFTING_H__
 #define __DLLIFTING_H__
 
+#define DLLIFTING_VERSION_MAJOR 1
+#define DLLIFTING_VERSION_MINOR 2
+#define DLLIFTING_VERSION_PATCH 0
+#define DLLIFTING_VERSION "1.2.0"
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
@@ -193,6 +198,7 @@ int Lifting_Lifting(DLLifting* lift, DTptype* rhs);
  * @param liftingorder  Remaining variables in lifting order
  * @param isLeq    1 for <= knapsack; 0 for >= knapsack
  * @param threshold  < 100 uses DL; > 100 uses DP (when isdl_mode = DLLIFTING_MODE_AUTO)
+ * @param duration   Reserved; unused (timing is written to lift->duration)
  * @param isdl_mode  DLLIFTING_MODE_AUTO / _DP / _DL — force table without switching
  * @return 1 on success; writes lifted coefficients into p and rhs.
  */
@@ -214,7 +220,7 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
 // Down lifting
 int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *rhs);
 
-int Lifting_Compress(DLLifting* lift, int begin = 0);
+int Lifting_Compress(DLLifting* lift, int begin);
 int Lifting_Expand(DLLifting* lift);
 
 //One unbounded knapsack DP

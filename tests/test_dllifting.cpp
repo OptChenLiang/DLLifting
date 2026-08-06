@@ -784,35 +784,35 @@ static void test_random_lifting(int trials)
 }
 
 static int run_main() {
-      printf("======== DLLifting comprehensive tests ========\n\n");
+   printf("======== DLLifting comprehensive tests ========\n\n");
 
-      printf("--- Unit: Findind ---\n");
-      test_findind_both();
+   printf("--- Unit: Findind ---\n");
+   test_findind_both();
 
-      printf("\n--- DP / DL table (multi threshold) ---\n");
-      run_all_table_cases();
+   printf("\n--- DP / DL table (multi threshold) ---\n");
+   run_all_table_cases();
 
-      printf("\n--- Compress / Expand ---\n");
-      test_compress_expand_roundtrip();
+   printf("\n--- Compress / Expand ---\n");
+   test_compress_expand_roundtrip();
 
-      printf("\n--- Full lifting DL vs DP ---\n");
-      run_all_lifting_cases();
+   printf("\n--- Full lifting DL vs DP ---\n");
+   run_all_lifting_cases();
 
-      printf("\n--- Bounded integer lifting (u>1) ---\n");
-      run_bounded_int_lifting_cases();
+   printf("\n--- Bounded integer lifting (u>1) ---\n");
+   run_bounded_int_lifting_cases();
 
-      printf("\n--- Random table cases (%d instances) ---\n", RAND_TABLE_TRIALS);
-      if (!RAND_TABLE_ONLY)
-         test_random_tables(RAND_TABLE_TRIALS);
+   printf("\n--- Random table cases (%d instances) ---\n", RAND_TABLE_TRIALS);
+   if (!RAND_TABLE_ONLY)
+      test_random_tables(RAND_TABLE_TRIALS);
 
-      printf("\n--- Random lifting cases (%d instances) ---\n", RAND_LIFT_TRIALS);
-      test_random_lifting(RAND_LIFT_TRIALS);
+   printf("\n--- Random lifting cases (%d instances) ---\n", RAND_LIFT_TRIALS);
+   test_random_lifting(RAND_LIFT_TRIALS);
 
-      printf("\n--- Random bounded lifting (u in 1..3, %d instances) ---\n",
-            RAND_BOUNDED_LIFT_TRIALS);
-      test_random_bounded_lifting(RAND_BOUNDED_LIFT_TRIALS);
+   printf("\n--- Random bounded lifting (u in 1..3, %d instances) ---\n",
+         RAND_BOUNDED_LIFT_TRIALS);
+   test_random_bounded_lifting(RAND_BOUNDED_LIFT_TRIALS);
 
-      printf("\n======== Summary: %d passed, %d failed ========\n", g_pass, g_fail);
+   printf("\n======== Summary: %d passed, %d failed ========\n", g_pass, g_fail);
    return g_fail;
 }
 
@@ -1857,13 +1857,23 @@ static int run_main() {
 
 } // namespace mixed_tests
 
-int main(void)
+int main(int argc, char** argv)
 {
    setvbuf(stdout, NULL, _IONBF, 0);
+   int run_all = 0;
+   for (int i = 1; i < argc; i++) {
+      if (strcmp(argv[i], "--all") == 0)
+         run_all = 1;
+   }
+
    int fail = core_tests::run_main();
-   printf("\n");
-   geq_tests::run_main();
-   printf("\n");
-   mixed_tests::run_main();
+   if (run_all) {
+      printf("\n");
+      fail += geq_tests::run_main();
+      printf("\n");
+      mixed_tests::run_main();
+   } else {
+      printf("\n(Use ./test_dllifting --all or `make test-all` for >= / mixed suites.)\n");
+   }
    return fail ? 1 : 0;
 }

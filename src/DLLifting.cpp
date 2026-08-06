@@ -14,6 +14,12 @@
 #  endif
 #endif
 
+#ifdef DLLIFTING_DEBUG
+#  define DLLIFTING_LOG(...) do { printf(__VA_ARGS__); } while (0)
+#else
+#  define DLLIFTING_LOG(...) ((void)0)
+#endif
+
 #ifdef DLTIME
 extern double findtime;
 extern double mergetime;
@@ -224,9 +230,6 @@ void Lifting_DPiter(DLLifting* lift, int w, double p)
 
 void Lifting_Print(DLLifting* lift)
 {
-#ifdef REDUCTION 
-   double m = lift->subcap - lift->tableleft;
-#endif
    if(lift->isDL)
       Lifting_Printsum(lift);
    else
@@ -235,6 +238,7 @@ void Lifting_Print(DLLifting* lift)
 
 void Lifting_DPPrint(double* dp, int c)
 {
+#ifdef DLLIFTING_DEBUG
    double p = dp[0];
    int i = 0;
    printf( "w = 0, p = %.1f\n", p);
@@ -247,6 +251,10 @@ void Lifting_DPPrint(double* dp, int c)
       }
    }
    printf("\n");
+#else
+   (void)dp;
+   (void)c;
+#endif
 }
 
 void Lifting_DPFree(double* dp)
@@ -256,6 +264,7 @@ void Lifting_DPFree(double* dp)
 
 void Lifting_Printsum(DLLifting* lift)
 {
+#ifdef DLLIFTING_DEBUG
    int i = 0;
    printf("len: %d\n", lift->n_soltable);
    for(i = 0; i<lift->n_soltable; i++)
@@ -263,6 +272,9 @@ void Lifting_Printsum(DLLifting* lift)
       printf("wsum = %.2f, psum = %.2f\n", lift->wsum[i], lift->psum[i]);
    }
    printf("\n");
+#else
+   (void)lift;
+#endif
 }
 
 void Lifting_Check(DLLifting* lift)
@@ -309,11 +321,8 @@ int Lifting_Alloc(DLLifting* lift, int len, int scale, double threshold)
    lift->wsum = lift->wsum1;
 
    lift->dplist = (double*) malloc ( (2* len)*sizeof(double)) ;
-   if(lift->dplist == NULL)
-   {
-      fprintf(stderr, "ERROR: malloc dplist\n");
+   if(lift->dplist == nullptr)
       return 0;
-   }
    lift->isDL = (threshold <= 100.0) ? 1 : 0;
    lift->threshold = threshold;
    lift->maxsolsize = len; 
@@ -361,7 +370,7 @@ int Lifting_Realloc(DLLifting* lift, int len)
    lift->wsum1 = wsum1;
    lift->wsum2 = wsum2;
    lift->maxsolsize = len;
-   printf("relloc len = %d\n", len);
+   DLLIFTING_LOG("realloc len = %d\n", len);
    return 1;
 }
 
@@ -524,16 +533,6 @@ int Lifting_Mergesort(DLLifting* lift, DTptype p, DTwtype w)
    DTptype* newpsum = nullptr;
    DTwtype* newwsum = nullptr;
 
-   int newsize = 2*lift->n_soltable+1;
-   if(0 && newsize > lift->maxsolsize && newsize <= lift->maxcap)
-   {
-      newsize = 2*newsize;
-      if( Lifting_Realloc(lift, newsize) != 1)
-      {
-         printf("ERROR: Lifting_Realloc\n ");
-         exit(0);
-      }
-   }
    if(lift->psum == lift->psum1)
    {
       oldpsum = lift->psum1;
@@ -712,10 +711,7 @@ int Lifting_Mergesortinf(DLLifting* lift, DTptype p, DTwtype w)
    if(newsize > lift->maxsolsize)
    {
       if( Lifting_Realloc(lift, newsize) != 1)
-      {
-         printf("ERROR: Lifting_Realloc\n ");
-         exit(0);
-      }
+         return 0;
       lift->maxsolsize = newsize;
    }
    if(lift->psum == lift->psum1)
@@ -900,7 +896,7 @@ int Lifting_Multiply(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
             {
                if(lift->force_mode < 0 && lift->threshold < 100)
                {
-                  Lifting_Compress(lift);
+                  Lifting_Compress(lift, 0);
                   Lifting_Mergesort(lift, p*k, w*k);
                   lift->isDL = true;
                }
@@ -932,7 +928,7 @@ int Lifting_Multiply(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
             {
                if(lift->force_mode < 0 && lift->threshold < 100)
                {
-                  Lifting_Compress(lift);
+                  Lifting_Compress(lift, 0);
                   Lifting_Mergesort(lift, p*k, w*k);
                   lift->isDL = true;
                }
@@ -1016,11 +1012,7 @@ DTptype Lifting_Calinitrhs(DLLifting* lift)
       {
          i = Lifting_Findind(lift, qcap, 0, lift->n_soltable-1, 1);
          if( i == -1)
-         {
-            printf("Find %.0f\n", qcap);
-            assert(i >= 0);
             return INF_DL;
-         }
          return lift->psum[i];
       }
       return lift->dplist[FLOOR_INT(qcap)];
@@ -1374,6 +1366,7 @@ int lifting(
       double* rhs,
       int isleq, double* x, int n, double threshold, double duration, int isdl_mode)
 {
+   (void)duration;
    if(lift == nullptr)
       return 0;
    /* Caller may pass an uninitialized struct; clear before Alloc/Free logic. */

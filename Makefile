@@ -1,9 +1,10 @@
 # DLLifting — DL/DP hybrid lifting for knapsack cover inequalities
 CXX = g++
-CXXFLAGS = -Wall -Wextra -O2 -std=c++11 -Iinclude -fPIC
+CXXFLAGS = -Wall -Wextra -O2 -std=c++11 -Iinclude -fPIC -DNDEBUG
 LDFLAGS = -shared
 LIBS = -lm
 RPATH = -Wl,-rpath,'$$ORIGIN'
+PREFIX ?= $(HOME)/.local
 
 REDUCTION ?= 1
 ifeq ($(REDUCTION),1)
@@ -11,18 +12,18 @@ ifeq ($(REDUCTION),1)
 endif
 
 SRC = src/DLLifting.cpp
-HDR = include/DLLifting.h
+HDR = include/DLLifting.h include/dllifting_c.h
 LIB = libdllifting.so
 OBJ = DLLifting.o
 
-.PHONY: all test examples example install clean
+.PHONY: all test test-all examples example install clean
 
 all: $(LIB)
 
 $(LIB): $(OBJ)
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-$(OBJ): $(SRC) $(HDR)
+$(OBJ): $(SRC) include/DLLifting.h
 	$(CXX) $(CXXFLAGS) -c $(SRC) -o $@
 
 test_dllifting: tests/test_dllifting.cpp $(LIB)
@@ -33,8 +34,13 @@ example: examples/example.cpp $(LIB)
 
 examples: example
 
+# Default gate: core (<=) suite only — must pass for release.
 test: test_dllifting
 	./test_dllifting
+
+# Extended: also run >= and mixed suites (geq may report known failures).
+test-all: test_dllifting
+	./test_dllifting --all
 
 install: $(LIB) $(HDR)
 	install -d $(DESTDIR)$(PREFIX)/lib $(DESTDIR)$(PREFIX)/include
