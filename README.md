@@ -1,6 +1,6 @@
 # DLLifting
 
-**DLLifting** (v1.2.2) is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports optional capacity reduction (**DL-R** / **DP-R**) and can be embedded in MIP solvers via cut callbacks or custom separators.
+**DLLifting** (v1.2.2) is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on general knapsack set. It supports optional capacity reduction (**DL-R** / **DP-R**) and can be embedded in MIP solvers via cut callbacks or custom separators.
 
 ## Scope
 
@@ -209,7 +209,7 @@ dllifting/
 
 ## License
 
-MIT License — see [LICENSE](LICENSE). Copyright (c) 2026 Xintong Wang and contributors.
+MIT License — see [LICENSE](LICENSE). Copyright (c) 2026 XINTONG WANG, LIANG CHEN, YU-HONG DAI.
 
 ## Citation
 
