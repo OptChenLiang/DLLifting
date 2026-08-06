@@ -10,10 +10,10 @@ ifeq ($(REDUCTION),1)
   CXXFLAGS += -DDLLIFTING_REDUCTION
 endif
 
-SRC = src/DLLifting.cpp src/dllifting_c.cpp
+SRC = src/DLLifting.cpp
 HDR = include/DLLifting.h
 LIB = libdllifting.so
-OBJ = DLLifting.o dllifting_c.o
+OBJ = DLLifting.o
 
 .PHONY: all test examples example install clean
 
@@ -22,11 +22,8 @@ all: $(LIB)
 $(LIB): $(OBJ)
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-DLLifting.o: src/DLLifting.cpp $(HDR)
-	$(CXX) $(CXXFLAGS) -c src/DLLifting.cpp -o $@
-
-dllifting_c.o: src/dllifting_c.cpp $(HDR)
-	$(CXX) $(CXXFLAGS) -c src/dllifting_c.cpp -o $@
+$(OBJ): $(SRC) $(HDR)
+	$(CXX) $(CXXFLAGS) -c $(SRC) -o $@
 
 test_dllifting: tests/test_dllifting.cpp $(LIB)
 	$(CXX) $(CXXFLAGS) tests/test_dllifting.cpp -L. -ldllifting $(RPATH) -o $@ $(LIBS)

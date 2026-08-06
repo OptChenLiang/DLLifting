@@ -122,9 +122,11 @@ typedef struct DLLifting
    int                n_soltable;
    int                maxsolsize;
    double             rhs;
-   double             tableleft;     // REDUCTION: L=sum u_i*w_i; m=subcap-L
+   double             tableleft;     // REDUCTION: U^k = sum u_i*w_i on remaining bounded vars
    int                reduction_active; // 0 if any variable is unbounded (disable REDUCTION)
-   int                reduction_usable; // 1 if tableleft in (0, subcap] after init (REDUCTION can apply)
+   int                reduction_usable; // 1 if U^k>0 and subcap>0 after init (REDUCTION enabled)
+   double             reduction_U_init; // U^k at init (after Calsubcap)
+   double             reduction_b_init; // b^k = subcap at init
 
    DTptype*           psum1;
    DTwtype*           wsum1;

@@ -143,17 +143,23 @@ int main() {
 
 The final cut is \(2x_1+x_2+x_3+\tfrac12 x_4+\tfrac32 x_5\le \tfrac{11}{2}\).
 
-More demos: `examples/example.cpp` (`make example && ./example`).
+Run this example:
+
+```bash
+make
+make example && ./example
+```
+
+Expected cut: \(2x_1+x_2+x_3+\tfrac12 x_4+\tfrac32 x_5\le \tfrac{11}{2}\).
 
 ## Project layout
 
 ```
 dllifting/
 ├── include/DLLifting.h   # public header (C++ + C ABI)
-├── src/DLLifting.cpp     # lifting implementation
-├── src/dllifting_c.cpp   # C wrapper
+├── src/DLLifting.cpp     # lifting + C wrapper (single translation unit)
 ├── libdllifting.so       # built by make (shared library)
-├── examples/             # usage examples
+├── examples/example.cpp  # README 5-var instance
 ├── tests/test_dllifting.cpp
 ├── Makefile
 └── LICENSE
