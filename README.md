@@ -1,13 +1,13 @@
 # DLLifting
 
-**DLLifting** is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports both `<=` and `>=` knapsack rows, optional capacity reduction (**DP_R** / **DL_R**), and can be embedded in MIP solvers via cut callbacks or custom separators.
+**DLLifting** is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on knapsack cover inequalities. It supports both `<=` and `>=` knapsack rows, optional capacity reduction (**DP-R** / **DL-R**), and can be embedded in MIP solvers via cut callbacks or custom separators.
 
 ## Scope
 
 - Knapsack set with general upper bounds (bounded and unbounded items)
 - Sequential up/down lifting with hybrid **DL** / **DP** subproblem solvers
 - Forced modes **DL**, **DP**, or threshold-based **AUTO** switching
-- Optional reduction variants **DL_R** / **DP_R** (compile-time `REDUCTION=1`)
+- Optional reduction variants **DL-R** / **DP-R** (compile-time `REDUCTION=1`)
 - Stable C ABI (`dllifting_lift_cover`) and full C++ API (`lifting`)
 - No dependency on external optimization libraries
 
@@ -51,17 +51,21 @@ All public symbols are declared in `include/DLLifting.h`.
 
 | Constant | Effect |
 | -------- | ------ |
-| `DLLIFTING_MODE_AUTO` | Threshold-based DL↔DP switch on bounded items (default) |
-| `DLLIFTING_MODE_DL` | Force DL table; no switching |
-| `DLLIFTING_MODE_DP` | Force DP table; no switching |
+| `DLLIFTING_MODE_AUTO` | Use `threshold` to choose DL/DP (`&lt; 100` → DL, `&gt; 100` → DP); may switch on bounded items |
+| `DLLIFTING_MODE_DL` | Force DL table; `threshold` ignored |
+| `DLLIFTING_MODE_DP` | Force DP table; `threshold` ignored |
 
 ### `lifting` (C++)
 
 Full sequential lifting with prescribed seed and lifting order. See `include/DLLifting.h`.
 
+Trailing parameters: `threshold`, `duration`, `isdl_mode`.
+
 ### `dllifting_lift_cover` (C)
 
 Stable C wrapper for solver callbacks; see `include/DLLifting.h`.
+
+Parameters include `threshold` and `isdl_mode` (same meaning as in `lifting()`).
 
 **Return value:** `DLLIFTING_OK` (0) on success; negative error code otherwise.
 
@@ -100,7 +104,8 @@ with \(N_0^2=\{3,4\}\), \(N_u^2=\{5\}\), \(b^2=18\), \(\beta^2=4\).
 | `is_subcap` | `1` |
 | `seed` | `[0, 1]` (\(x_1,x_2\)) |
 | `lifting_order` | `[2, 3, 4]` (\(x_3,x_4,x_5\)) |
-| `isdl_mode` | `DLLIFTING_MODE_DP` (integer weights) |
+| `threshold` | `10.0` — under `AUTO`: `&lt;100` → DL, `&gt;100` → DP; ignored if mode is `DL`/`DP` |
+| `isdl_mode` | `DLLIFTING_MODE_DP` (force DP; integer weights) |
 
 **Output**
 
@@ -129,7 +134,7 @@ int main() {
    DLLifting lift = {};
    if (!lifting(&lift, p, w, u, isuseub, 18.0, 1,
             seed, 2, order, 3, &rhs, 1, nullptr, n,
-            10.0, 0.0, DLLIFTING_MODE_DP))
+            /* threshold */ 10.0, /* duration */ 0.0, DLLIFTING_MODE_DP))
       return 1;
 
    for (int i = 0; i < n; i++) {
