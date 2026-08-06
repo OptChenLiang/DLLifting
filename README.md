@@ -209,13 +209,13 @@ dllifting/
 
 ## License
 
-MIT License — see [LICENSE](LICENSE). Copyright (c) 2026 XINTONG WANG, LIANG CHEN, YU-HONG DAI.
+MIT License — see [LICENSE](LICENSE). Copyright (c) 2026 Xintong Wang, Liang Chen, Yu-hong Dai.
 
 ## Citation
 
 If you use DLLifting in research, please cite your related knapsack lifting / separation paper and this repository:
 
 ```
-Xintong Wang et al. DLLifting: DL/DP hybrid lifting for knapsack cover inequalities.
+Xintong Wang et al. DLLifting: DL/DP hybrid lifting for general knapsack set.
 https://159.226.92.34:8000/wangxintong/dllifting (version 1.2.2).
 ```

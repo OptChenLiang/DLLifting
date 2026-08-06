@@ -1,4 +1,4 @@
-# DLLifting — DL/DP hybrid lifting for knapsack cover inequalities
+# DLLifting — DL/DP hybrid lifting for general knapsack set
 CXX = g++
 CXXFLAGS = -Wall -Wextra -O2 -std=c++11 -Iinclude -fPIC -DNDEBUG
 LDFLAGS = -shared
