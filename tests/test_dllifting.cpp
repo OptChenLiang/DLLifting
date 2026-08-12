@@ -168,10 +168,12 @@ static int setup_lift(DLLifting* lift, int cap, int isleq, double threshold)
    lift->cap = cap;
    lift->subcap = cap;
    lift->maxcap = cap;
-   /* memset leaves force_mode=0 (DP); AUTO is required for threshold switching */
-   lift->force_mode = DLLIFTING_MODE_AUTO;
+   /* THRESHOLD mode required for mid-lift switching by τ vs bar b */
+   lift->force_mode = DLLIFTING_MODE_THRESHOLD;
    if (!Lifting_Alloc(lift, cap, 1, threshold))
       return 0;
+   lift->switch_cap = threshold;
+   lift->threshold = threshold;
    Lifting_Reset(lift, cap);
    return 1;
 }
@@ -420,7 +422,7 @@ static void test_lifting_dp_valid(const char* tag, int isleq, int n,
    DLLifting L;
    memset(&L, 0, sizeof(L));
    if (!lifting(&L, p, w, u, isuseub, cap, 0, seed, n_seed, order, n_ord,
-            &rhs, isleq, NULL, n, 200.0, 0.0, DLLIFTING_MODE_AUTO)) {
+            &rhs, isleq, NULL, n, 0.0, 0.0, DLLIFTING_MODE_DP)) {
       fail("lifting DP failed");
       return;
    }
@@ -431,7 +433,7 @@ static void test_lifting_dp_valid(const char* tag, int isleq, int n,
       return;
    }
    char buf[200];
-   snprintf(buf, sizeof(buf), "%s DP-only lift valid (thr=200)", tag);
+   snprintf(buf, sizeof(buf), "%s DP-only lift valid (MODE_DP)", tag);
    ok(buf);
 }
 
@@ -453,14 +455,14 @@ static void test_lifting_dl_dp_agree(const char* tag, int isleq, int n,
    memset(&Lp, 0, sizeof(Lp));
 
    if (!lifting(&Ld, p_dl, w, u, isuseub, cap, 0, seed, n_seed, order, n_ord,
-            &rhs_dl, isleq, NULL, n, 10.0, 0.0, DLLIFTING_MODE_AUTO)) {
+            &rhs_dl, isleq, NULL, n, 0.0, 0.0, DLLIFTING_MODE_DL)) {
       char buf[128];
       snprintf(buf, sizeof(buf), "%s: lifting DL path failed", tag);
       fail(buf);
       return;
    }
    if (!lifting(&Lp, p_dp, w, u, isuseub, cap, 0, seed, n_seed, order, n_ord,
-            &rhs_dp, isleq, NULL, n, 200.0, 0.0, DLLIFTING_MODE_AUTO)) {
+            &rhs_dp, isleq, NULL, n, 0.0, 0.0, DLLIFTING_MODE_DP)) {
       fail("lifting DP failed");
       return;
    }
@@ -906,10 +908,12 @@ static int setup_lift(DLLifting* lift, int cap, int isleq, double threshold)
    lift->cap = cap;
    lift->subcap = cap;
    lift->maxcap = cap;
-   /* memset leaves force_mode=0 (DP); AUTO is required for threshold switching */
-   lift->force_mode = DLLIFTING_MODE_AUTO;
+   /* THRESHOLD mode required for mid-lift switching by τ vs bar b */
+   lift->force_mode = DLLIFTING_MODE_THRESHOLD;
    if (!Lifting_Alloc(lift, cap, 1, threshold))
       return 0;
+   lift->switch_cap = threshold;
+   lift->threshold = threshold;
    Lifting_Reset(lift, cap);
    return 1;
 }
@@ -1062,7 +1066,7 @@ static void test_dl_table_invariants_geq()
    teardown_lift(&lift);
 }
 
-/* End-to-end: DL path (threshold=10) vs DP path (threshold=200) must agree. */
+/* End-to-end: MODE_DL vs MODE_DP must agree. */
 static void run_lifting_compare_paths(const char* name, int n,
       double* p_dl, double* w, double* u, int* isuseub,
       double cap, int* seed, int n_seed, int* order, int n_ord)
@@ -1083,13 +1087,13 @@ static void run_lifting_compare_paths(const char* name, int n,
    memset(&lift_dp, 0, sizeof(lift_dp));
 
    if (!lifting(&lift_dl, p_dl, w, u, isuseub, cap, 0, seed, n_seed,
-            order, n_ord, &rhs_dl, 0, NULL, n, 10.0, 0.0, DLLIFTING_MODE_AUTO)) {
+            order, n_ord, &rhs_dl, 0, NULL, n, 0.0, 0.0, DLLIFTING_MODE_DL)) {
       fail("DL path lifting failed");
       return;
    }
 
    if (!lifting(&lift_dp, p_dp, w, u, isuseub, cap, 0, seed, n_seed,
-            order, n_ord, &rhs_dp, 0, NULL, n, 200.0, 0.0, DLLIFTING_MODE_AUTO)) {
+            order, n_ord, &rhs_dp, 0, NULL, n, 0.0, 0.0, DLLIFTING_MODE_DP)) {
       fail("DP path lifting failed");
       return;
    }
@@ -1215,7 +1219,7 @@ static void run_lifting_case_ex(const char* name, int isleq, double threshold,
 
    if (!lifting(&lift, p, w, u, isuseub, cap, 0, seed, n_seed,
             liftingorder, n_liftingorder, &rhs, isleq, NULL, n, threshold, 0.0,
-            DLLIFTING_MODE_AUTO)) {
+            DLLIFTING_MODE_DP)) {
       fail(name);
       printf("  lifting() returned 0\n");
       return;
@@ -1238,8 +1242,8 @@ static void run_lifting_case(const char* name, int isleq,
       int n, double* p, double* w, double* u, int* isuseub,
       double cap, int* seed, int n_seed, int* liftingorder, int n_liftingorder)
 {
-   /* threshold=200 forces DP table updates (reliable for >= path) */
-   run_lifting_case_ex(name, isleq, 200.0, n, p, w, u, isuseub, cap, seed, n_seed,
+   /* MODE_DP: reliable for >= path */
+   run_lifting_case_ex(name, isleq, 0.0, n, p, w, u, isuseub, cap, seed, n_seed,
          liftingorder, n_liftingorder);
 }
 
@@ -1359,13 +1363,14 @@ static void test_up_lifting_step_geq()
    teardown_lift(&lift);
 }
 
-/* threshold>100: Multiply switches to DP mode (isDL=false) */
+/* τ > bar b^k: Multiply switches to DP mode (isDL=false) */
 static void test_dp_mode_switch()
 {
    DLLifting lift;
    int cap = 18;
 
-   if (!setup_lift(&lift, cap, 0, 200.0)) {
+   /* switch_cap=100 >> bar b (=18) → prefer DP */
+   if (!setup_lift(&lift, cap, 0, 100.0)) {
       fail("alloc test_dp_mode_switch");
       return;
    }
@@ -1373,11 +1378,49 @@ static void test_dp_mode_switch()
    lift.isDL = 1;
    Lifting_Multiply(&lift, 4.0, 5.0, 2);
    if (!lift.isDL)
-      ok("threshold>100 switches to DP after Multiply");
+      ok("tau > bar_b switches to DP after Multiply");
    else
-      fail("threshold>100 should set isDL=false");
+      fail("tau > bar_b should set isDL=false");
 
    teardown_lift(&lift);
+}
+
+static void test_select_backend_policy()
+{
+   DLLiftingFeatures feat;
+   DLLiftingPolicy pol;
+   dllifting_policy_default(&pol);
+
+   feat.rho_w = 3.0;
+   feat.beta = 10.0;
+   feat.u_bar = 20.0;
+   feat.w_mean = 20.0;
+   feat.w_min = 10.0;
+   feat.w_max = 30.0;
+   if (dllifting_select_backend(&feat, &pol) == DLLIFTING_MODE_DP)
+      ok("narrow+large beta → DP");
+   else
+      fail("expected DP for rho=3 beta=10");
+
+   feat.rho_w = 10.0;
+   if (dllifting_select_backend(&feat, &pol) == DLLIFTING_MODE_DL)
+      ok("wide rho → DL");
+   else
+      fail("expected DL for rho=10");
+
+   feat.rho_w = 3.0;
+   feat.beta = 4.0;
+   if (dllifting_select_backend(&feat, &pol) == DLLIFTING_MODE_DL)
+      ok("small beta → DL");
+   else
+      fail("expected DL for beta=4");
+
+   feat.beta = 20.0;
+   feat.u_bar = 1.5;
+   if (dllifting_select_backend(&feat, &pol) == DLLIFTING_MODE_DL)
+      ok("near-binary u_bar → DL");
+   else
+      fail("expected DL for u_bar=1.5");
 }
 
 /* Random micro-instances with a seed that covers (required for a valid init cut) */
@@ -1437,6 +1480,7 @@ static int run_main() {
       /* DL merge for >= is exercised in test_dl_dp_paths_agree / geq_tiny_dl */
       test_up_lifting_step_geq();
       test_dp_mode_switch();
+      test_select_backend_policy();
       test_full_lifting_geq_tiny();
    #if 0
       /* Re-enable when Lifting_Mergesort(!isleq) DL table is verified */

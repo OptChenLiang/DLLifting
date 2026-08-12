@@ -29,12 +29,12 @@ int main(void) {
    DLLifting lift = {};
    if (!lifting(&lift, p, w, u, isuseub, 18.0, 1,
             seed, 2, order, 3, &rhs, 1, nullptr, n,
-            10.0, 0.0, DLLIFTING_MODE_DP)) {
+            /* threshold */ 0.0, /* duration */ 0.0, DLLIFTING_MODE_DP)) {
       std::fprintf(stderr, "lifting failed\n");
       return 1;
    }
 
-   std::printf("lifting() DP (README 5-var example):\n");
+   std::printf("lifting() MODE_DP (README 5-var example):\n");
    print_cut(n, p, rhs);
    std::printf("  (%.4f s)\n", lift.duration);
 
@@ -42,7 +42,7 @@ int main(void) {
    double coef[] = {2.0, 1.0, 0.0, 0.0, 0.0};
    rhs = 0.0;
    if (dllifting_lift_cover(n, coef, w, u, isuseub, 18.0, 1,
-            seed, 2, order, 3, &rhs, 1, 10.0, DLLIFTING_MODE_DP, nullptr)
+            seed, 2, order, 3, &rhs, 1, 0.0, DLLIFTING_MODE_DP, nullptr)
          != DLLIFTING_OK) {
       std::fprintf(stderr, "dllifting_lift_cover failed\n");
       return 1;

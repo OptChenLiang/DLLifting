@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.0] - 2026-08-12
+
+### Changed
+
+- **Orthogonal controls** for hybrid lifting (documented in README):
+  - **DL/DP:** `MODE_DL` / `MODE_DP` (hard force); `MODE_THRESHOLD` (manual \(\tau\) vs
+    \(\bar b^k\), mid-lift); `MODE_AUTO` (feature map on \(\rho_w,\beta,\bar u\); default).
+  - **+R:** `reduction_request` = `RED_ON` / `RED_OFF` / `RED_AUTO` (\(\bar b^0>\tau\)).
+- `threshold` is \(\tau\) only for `MODE_THRESHOLD` and `RED_AUTO` — not for `MODE_AUTO`.
+- Helpers: `dllifting_policy_default`, `dllifting_compute_features`,
+  `dllifting_select_backend`, `Lifting_bar_b`; Multiply mid-lift unified via `Lifting_add_chunk`.
+
 ## [1.2.2] - 2026-08-06
 
 ### Changed

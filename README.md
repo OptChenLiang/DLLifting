@@ -1,70 +1,106 @@
 # DLLifting
 
-**DLLifting** (v1.2.2) is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on general knapsack set. It supports optional capacity reduction (**DL-R** / **DP-R**) and can be embedded in MIP solvers via cut callbacks or custom separators.
+**DLLifting** (v1.3.0) is a standalone C/C++ library for **DL/DP hybrid coefficient lifting** on general knapsack sets. Optional capacity reduction (**+R**) is independent of the DL/DP backend. Prefer the C++ API `lifting()` or the C ABI `dllifting_lift_cover()`.
 
 ## Scope
 
-- Knapsack set with general upper bounds (bounded and unbounded items)
-- Sequential up/down lifting with hybrid **DL** / **DP** subproblem solvers
-- Forced modes **DL**, **DP**, or threshold-based **AUTO** switching
-- Optional reduction variants **DL-R** / **DP-R** (compile-time `REDUCTION=1`)
-- Preferred API: C++ `lifting()`, C ABI `dllifting_lift_cover()`
-- No dependency on external optimization libraries
+- General upper bounds (bounded and unbounded variables)
+- Sequential up/down lifting with **DL** or **DP** subproblem tables
+- Three DL/DP controls: hard force, τ-threshold policy, or automatic feature map
+- Optional **+R** (compile with `REDUCTION=1`; runtime ON/OFF/AUTO)
+- No external solver dependency
 
-**Maturity:** `sum w x <= b` (`is_leq = 1`) is the primary / production path.  
-`sum w x >= b` (`is_leq = 0`) produces **≥ cover inequalities** via sequential lifting; covered by `make test` / `make test-all`.
+**Maturity:** \(\sum w x \le b\) (`is_leq = 1`) is the production path.  
+\(\sum w x \ge b\) (`is_leq = 0`) is supported and covered by tests.
 
 ## Requirements
 
-- C++11 compiler (GCC or Clang; MSVC untested)
+- C++11 (GCC or Clang; MSVC untested)
 - GNU Make
 
 ## Build
 
-| Target | Command | What it does |
-| ------ | ------- | ------------ |
-| Library | `make` | Build `libdllifting.so` |
-| Unit tests | `make test` | Core `<=` **and** geq `>=`; exit code = failure count (e.g. 5 geq fails → exit 5) |
-| Extended tests | `make test-all` | Also mixed-variable suite |
-| Example | `make example` | Build `./example` (then run it) |
+| Target | Command |
+| ------ | ------- |
+| Library | `make` → `libdllifting.so` |
+| Tests | `make test` |
+| Extended tests | `make test-all` |
+| Example | `make example && ./example` |
 
 ```bash
-make
-make test
-make example && ./example
+make && make test
+make clean && make REDUCTION=0 && make test REDUCTION=0   # build without +R
 ```
-
-Disable reduction:
-
-```bash
-make clean && make REDUCTION=0 && make test REDUCTION=0
-```
-
-Link your program:
 
 ```bash
 g++ -O2 my_app.cpp -Iinclude -L. -ldllifting -Wl,-rpath,'$ORIGIN' -lm -o my_app
+make install   # default PREFIX=$HOME/.local
 ```
 
-Install (default `PREFIX=$HOME/.local`):
+## Parameter model (v1.3)
 
-```bash
-make install
-# or: make install PREFIX=/usr/local
+Two **orthogonal** axes. Do not combine `MODE_AUTO` with `threshold` to mean “force DL/DP”.
+
+### Axis 1 — DL / DP (`isdl_mode`)
+
+| Mode | Meaning |
+| ---- | ------- |
+| `DLLIFTING_MODE_DL` / `_DP` | **Manual hard force.** No mid-lift switch. |
+| `DLLIFTING_MODE_THRESHOLD` | **Manual τ policy.** `threshold` = capacity \(\tau\). Initial and mid-lift use \(\tau\) vs \(\bar b^k=\min(b^k,U^k)\): \(\tau>\bar b^k\) → DP, \(\tau<\bar b^k\) → DL. |
+| `DLLIFTING_MODE_AUTO` | **Default automatic.** Select from row features \((\rho_w,\beta,\bar u)\). **Ignores `threshold` for mode.** No mid-lift. |
+
+Defaults for AUTO (override via `lift->rho_th` / `beta_th` / `u_bar_th` before the call; `0` → library defaults):
+
+| Symbol | Default | Rule of thumb |
+| ------ | ------- | ------------- |
+| \(\rho_w=w_{\max}/w_{\min}\) | \(\rho_{\mathrm{th}}=6\) | \(\rho_w\ge\rho_{\mathrm{th}}\) → DL |
+| \(\beta=b/\mathrm{mean}(w)\) | \(\beta_{\mathrm{th}}=6\) | \(\beta<\beta_{\mathrm{th}}\) → DL; else if narrow \(w\) → DP |
+| \(\bar u=\mathrm{mean}(u)\) | \(\bar u_{\mathrm{th}}=3\) | near-binary / small \(\bar u\) → DL |
+| Fuzzy band | 10% of thresholds | favors DL |
+
+Helpers: `dllifting_compute_features`, `dllifting_select_backend`, `dllifting_policy_default`.
+
+### Axis 2 — Reduction +R (`lift->reduction_request`)
+
+Requires compile-time `REDUCTION=1` (default in `make`). Always disabled if any variable is treated as unbounded.
+
+| Value | Meaning |
+| ----- | ------- |
+| `DLLIFTING_RED_ON` / `_OFF` | **Manual** |
+| `DLLIFTING_RED_AUTO` (0, default) | Enable iff \(\bar b^0 > \tau\) (large residual) |
+
+### Role of `threshold`
+
+| Context | Role of `threshold` |
+| ------- | ------------------- |
+| `MODE_THRESHOLD` | \(\tau\) for initial + mid-lift |
+| `RED_AUTO` | \(\tau\) for the \(\bar b^0 > \tau\) test |
+| `MODE_AUTO` / `_DL` / `_DP` | **Not** used to choose the backend |
+
+If `threshold <= 0`, \(\tau=\beta_{\mathrm{th}}\cdot\mathrm{mean}(w)\).
+
+### Quick recipes
+
+```cpp
+DLLifting lift = {};
+// Default production: AUTO backend + AUTO +R
+lifting(&lift, ..., /*threshold*/ 0.0, 0.0, DLLIFTING_MODE_AUTO);
+
+// Hard DP / DL (benchmarks)
+lifting(&lift, ..., 0.0, 0.0, DLLIFTING_MODE_DP);
+lifting(&lift, ..., 0.0, 0.0, DLLIFTING_MODE_DL);
+
+// Manual τ with mid-lift (e.g. τ = 200)
+lifting(&lift, ..., 200.0, 0.0, DLLIFTING_MODE_THRESHOLD);
+
+// Force +R off
+lift.reduction_request = DLLIFTING_RED_OFF;
+lifting(&lift, ..., 0.0, 0.0, DLLIFTING_MODE_AUTO);
 ```
 
 ## API
 
-Public header: `include/DLLifting.h` (optional shim: `dllifting_c.h`).  
-Version: `DLLIFTING_VERSION` (`"1.2.2"`).
-
-### Lifting modes
-
-| Constant | Effect |
-| -------- | ------ |
-| `DLLIFTING_MODE_AUTO` | Use `threshold` (`< 100` → DL, `> 100` → DP); may switch on bounded items |
-| `DLLIFTING_MODE_DL` | Force DL; `threshold` ignored |
-| `DLLIFTING_MODE_DP` | Force DP; `threshold` ignored |
+Header: `include/DLLifting.h` (shim: `dllifting_c.h`). Version: `DLLIFTING_VERSION` (`"1.3.0"`).
 
 ### `lifting` (C++)
 
@@ -80,84 +116,31 @@ int lifting(
       double threshold, double duration, int isdl_mode);
 ```
 
-| Parameter | Type | Direction | Meaning |
-| --------- | ---- | --------- | ------- |
-| `lift` | `DLLifting*` | in/out | Workspace; on success `lift->duration` holds CPU seconds |
-| `p` | `double*` | in/out | Seed coefficients in, lifted coefficients out (length `n`) |
-| `w` | `double*` | in | Knapsack weights \(a_j\) |
-| `u` | `double*` | in | Variable upper bounds |
-| `isuseub` | `int*` | in | Per variable: `1` = down-lift (fix at UB), `0` = up-lift |
-| `cap` | `double` | in | Capacity \(b\), or residual subcapacity if `isSubCap=1` |
-| `isSubCap` | `int` | in | `1` if `cap` is residual after fixing \(N_u\); else `0` |
-| `seed` | `int*` | in | Indices of seed (cover) variables |
-| `n_seed` | `int` | in | Length of `seed` |
-| `liftingorder` | `int*` | in | Remaining variables in lift order |
-| `n_liftingorder` | `int` | in | Length of `liftingorder` |
-| `rhs` | `double*` | out | Lifted inequality right-hand side |
-| `isLeq` | `int` | in | `1`: \(\sum w x \le b\); `0`: \(\sum w x \ge b\) (experimental) |
-| `x` | `double*` | in | Optional fractional point; may be `NULL` |
-| `n` | `int` | in | Number of variables |
-| `threshold` | `double` | in | Used only if `isdl_mode == AUTO`: `&lt;100` → DL, `&gt;100` → DP |
-| `duration` | `double` | in | Optional time limit (seconds); `<= 0` = unlimited. Elapsed time is written to `lift->duration` |
-| `isdl_mode` | `int` | in | `DLLIFTING_MODE_AUTO` / `_DL` / `_DP` |
+| Parameter | Meaning |
+| --------- | ------- |
+| `lift` | Workspace. Optionally set `reduction_request`, `rho_th`, `beta_th`, `u_bar_th` before the call. On success `lift->duration` is CPU seconds (struct is cleared/rebuilt inside; policy fields are preserved). |
+| `p` | Seed coefficients in → lifted coefficients out |
+| `w`, `u` | Weights and upper bounds |
+| `isuseub` | `1` = down-lift (fix at UB), `0` = up-lift |
+| `cap` / `isSubCap` | Capacity \(b\), or residual if `isSubCap=1` |
+| `seed` / `liftingorder` | Cover indices and remaining lift order |
+| `rhs` | Lifted RHS (out) |
+| `isLeq` | `1`: \(\le\) knapsack; `0`: \(\ge\) (experimental) |
+| `x` | Optional fractional point; may be `NULL` |
+| `threshold` | \(\tau\) for `MODE_THRESHOLD` and `RED_AUTO`; see table above |
+| `duration` | Optional time limit (seconds); `<=0` = unlimited |
+| `isdl_mode` | `MODE_AUTO` / `MODE_THRESHOLD` / `MODE_DL` / `MODE_DP` |
 
-**Return:** `1` on success, `0` on failure (allocation or internal error).
+**Return:** `1` success, `0` failure.
 
 ### `dllifting_lift_cover` (C)
 
-```c
-int dllifting_lift_cover(
-      int n, double* coef,
-      const double* weight, const double* ub, const int* use_ub,
-      double cap, int is_subcap,
-      const int* seed, int n_seed,
-      const int* lifting_order, int n_order,
-      double* rhs,
-      int is_leq, double threshold, int isdl_mode,
-      const double* x_frac);    /* may be NULL */
-```
+Same semantics; returns `DLLIFTING_OK` (0) or `DLLIFTING_ERR_*`.
 
-**Return:** `DLLIFTING_OK` (0); `DLLIFTING_ERR_ARGS` / `DLLIFTING_ERR_ALLOC` / `DLLIFTING_ERR_INTERNAL` on failure.
+## Example
 
-### Example
-
-Consider the knapsack set
-
-\[
-\mathcal{X}=\Big\{ \boldsymbol{x}\in\mathbb{Z}_+^5:\;
-8x_1+5x_2+4x_3+3x_4+5x_5\le 23,\;
-x_1\le 2,\; x_2\le 3,\; x_3\le 6,\; x_4\le 5,\; x_5\le 1 \Big\}.
-\]
-
-Let \(C=\{1,2\}\), \(N_0=\{3,4\}\), \(N_u=\{5\}\), and lift in the order \(\{3,4,5\}\).
-The seed inequality \(2x_1+x_2\le 4\) is valid on the restricted set
-
-\[
-\mathcal{X}(N_0,N_u)=\Big\{ \boldsymbol{x}\in\mathbb{Z}_+^5:\;
-8x_1+5x_2\le 18,\;
-x_1\le 2,\; x_2\le 3,\; x_3=0,\; x_4=0,\; x_5=1 \Big\},
-\]
-
-with \(N_0^2=\{3,4\}\), \(N_u^2=\{5\}\), \(b^2=18\), \(\beta^2=4\).
-
-**Input** (0-based indices: \(x_1\!\mapsto\!0,\ldots,x_5\!\mapsto\!4\))
-
-| Field | Value |
-| ----- | ----- |
-| `n` | 5 |
-| `weight` | `[8, 5, 4, 3, 5]` |
-| `coef` (seed) | `[2, 1, 0, 0, 0]` |
-| `ub` | `[2, 3, 6, 5, 1]` |
-| `isuseub` | `[0, 0, 0, 0, 1]` — \(N_u=\{x_5\}\): down-lift |
-| `capacity` | `18` (\(b^2\)) |
-| `is_subcap` | `1` |
-| `seed` | `[0, 1]` |
-| `lifting_order` | `[2, 3, 4]` |
-| `threshold` | `10.0` — under `AUTO`: `<100` → DL, `>100` → DP; ignored if mode is `DL`/`DP` |
-| `isdl_mode` | `DLLIFTING_MODE_DP` |
-
-**Output:** coef `[2, 1, 1, 0.5, 1.5]`, rhs `5.5`  
-(i.e. \(2x_1+x_2+x_3+\tfrac12 x_4+\tfrac32 x_5\le \tfrac{11}{2}\)).
+Knapsack set \(\mathcal{X}=\{x\in\mathbb{Z}_+^5: 8x_1+5x_2+4x_3+3x_4+5x_5\le 23,\ \ldots\}\).  
+Seed \(2x_1+x_2\le 4\) on a restricted face with residual capacity \(18\); lift order \(\{3,4,5\}\).
 
 ```cpp
 #include <DLLifting.h>
@@ -176,46 +159,44 @@ int main() {
    DLLifting lift = {};
    if (!lifting(&lift, p, w, u, isuseub, 18.0, 1,
             seed, 2, order, 3, &rhs, 1, nullptr, n,
-            /* threshold */ 10.0, /* duration */ 0.0, DLLIFTING_MODE_DP))
+            /* threshold */ 0.0, /* duration */ 0.0, DLLIFTING_MODE_DP))
       return 1;
 
-   for (int i = 0; i < n; i++) {
+   for (int i = 0; i < n; i++)
       if (p[i] > EPS_DL)
          std::printf("%.4f*x_%d + ", p[i], i + 1);
-   }
    std::printf("<= %.4f  (%.4f s)\n", rhs, lift.duration);
    return 0;
 }
 ```
 
+Expected: coef `[2, 1, 1, 0.5, 1.5]`, rhs `5.5`.
+
 ```bash
 make && make example && ./example
 ```
 
-## Project layout
+## Layout
 
 ```
-dllifting/
-├── include/DLLifting.h      # public header (C++ + C ABI)
-├── include/dllifting_c.h    # compatibility include
-├── src/DLLifting.cpp        # single translation unit
+DLLifting/
+├── include/DLLifting.h
+├── include/dllifting_c.h
+├── src/DLLifting.cpp
 ├── examples/example.cpp
 ├── tests/test_dllifting.cpp
 ├── Makefile
 ├── CHANGELOG.md
-├── .gitlab-ci.yml
 └── LICENSE
 ```
 
 ## License
 
-MIT License — see [LICENSE](LICENSE). Copyright (c) 2026 Xintong Wang, Liang Chen, Yu-hong Dai.
+MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Xintong Wang, Liang Chen, Yu-hong Dai.
 
 ## Citation
 
-If you use DLLifting in research, please cite your related knapsack lifting / separation paper and this repository:
-
 ```
 Xintong Wang et al. DLLifting: DL/DP hybrid lifting for general knapsack set.
-https://159.226.92.34:8000/wangxintong/dllifting (version 1.2.2).
+https://159.226.92.34:8000/wangxintong/dllifting (version 1.3.0).
 ```
