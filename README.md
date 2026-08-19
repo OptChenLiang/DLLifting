@@ -198,5 +198,6 @@ MIT — see [LICENSE](LICENSE). Copyright (c) 2026 Xintong Wang, Liang Chen, Yu-
 
 ```
 Xintong Wang et al. DPLifting: DPL/DPT hybrid lifting for general knapsack set.
-https://159.226.92.34:8000/wangxintong/dllifting (version 1.4.0).
+https://github.com/OptChenLiang/DPLifting (version 1.4.0).
+https://159.226.92.34:8000/wangxintong/dllifting
 ```
