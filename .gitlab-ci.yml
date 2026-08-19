@@ -1,4 +1,4 @@
-# Minimal CI for DLLifting (GitLab)
+# Minimal CI for DPLifting (GitLab)
 stages:
   - build
 
@@ -13,5 +13,5 @@ build_and_test:
     - ./example
   artifacts:
     paths:
-      - libdllifting.so
+      - libdplifting.so
     expire_in: 1 week

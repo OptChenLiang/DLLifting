@@ -3,7 +3,7 @@ build/
 *.a
 *.so
 *.dylib
-test_dllifting
+test_dplifting
 test_isgeq
 test_mixed_vars
 test_mixed_vars_r

@@ -1,23 +1,23 @@
 /**
- * @file DLLifting.cpp
- * @brief Implementation of DL/DP hybrid knapsack lifting.
+ * @file DPLifting.cpp
+ * @brief Implementation of DPL/DPT hybrid knapsack lifting.
  **/
 
-#include <DLLifting.h>
+#include <DPLifting.h>
 #include <cstring>
 
 #define INITSIZE_LIFTING 5000000
 #define CHECK 1
 #ifndef REDUCTION
-#  ifdef DLLIFTING_REDUCTION
+#  ifdef DPLIFTING_REDUCTION
 #    define REDUCTION 1
 #  endif
 #endif
 
-#ifdef DLLIFTING_DEBUG
-#  define DLLIFTING_LOG(...) do { printf(__VA_ARGS__); } while (0)
+#ifdef DPLIFTING_DEBUG
+#  define DPLIFTING_LOG(...) do { printf(__VA_ARGS__); } while (0)
 #else
-#  define DLLIFTING_LOG(...) ((void)0)
+#  define DPLIFTING_LOG(...) ((void)0)
 #endif
 
 #ifdef DLTIME
@@ -28,12 +28,12 @@ extern int niter;
 extern double dptime;
 #endif
 
-int Lifting_Compress(DLLifting* lift, int begin);
-int Lifting_Expand(DLLifting* lift);
-static void Lifting_update(DLLifting* lift, int w, double p, int unbounded);
+int Lifting_Compress(DPLifting* lift, int begin);
+int Lifting_Expand(DPLifting* lift);
+static void Lifting_update(DPLifting* lift, int w, double p, int unbounded);
 
 // Effective unboundedness: u is INF, or u >= 2 and a*(u+1) > b
-static int Lifting_unbounded(const DLLifting* lift, DTwtype a, DTutype ub)
+static int Lifting_unbounded(const DPLifting* lift, DTwtype a, DTutype ub)
 {
    if(ISZERO(a))
       return 0;
@@ -44,18 +44,18 @@ static int Lifting_unbounded(const DLLifting* lift, DTwtype a, DTutype ub)
    return a * (ub + 1.0) > lift->maxcap;
 }
 
-void dllifting_policy_default(DLLiftingPolicy* pol)
+void dplifting_policy_default(DPLiftingPolicy* pol)
 {
    if(!pol)
       return;
-   pol->rho_th = DLLIFTING_DEFAULT_RHO_TH;
-   pol->beta_th = DLLIFTING_DEFAULT_BETA_TH;
-   pol->u_bar_th = DLLIFTING_DEFAULT_UBAR_TH;
-   pol->prefer_dl_fuzzy = 1;
+   pol->rho_th = DPLIFTING_DEFAULT_RHO_TH;
+   pol->beta_th = DPLIFTING_DEFAULT_BETA_TH;
+   pol->u_bar_th = DPLIFTING_DEFAULT_UBAR_TH;
+   pol->prefer_dpl_fuzzy = 1;
 }
 
-void dllifting_compute_features(
-      const DTwtype* w, const DTutype* u, int n, DTctype cap, DLLiftingFeatures* feat)
+void dplifting_compute_features(
+      const DTwtype* w, const DTutype* u, int n, DTctype cap, DPLiftingFeatures* feat)
 {
    if(!feat)
       return;
@@ -84,29 +84,29 @@ void dllifting_compute_features(
    feat->w_max = wmax;
    feat->w_mean = wsum / (double)n;
    feat->u_bar = u ? (usum / (double)n) : 0.0;
-   feat->rho_w = (wmin > EPS_DL) ? (wmax / wmin) : 1.0;
-   feat->beta = (feat->w_mean > EPS_DL) ? (cap / feat->w_mean) : 0.0;
+   feat->rho_w = (wmin > EPS_DPL) ? (wmax / wmin) : 1.0;
+   feat->beta = (feat->w_mean > EPS_DPL) ? (cap / feat->w_mean) : 0.0;
 }
 
-static void dllifting_policy_fill(DLLiftingPolicy* pol)
+static void dplifting_policy_fill(DPLiftingPolicy* pol)
 {
    if(pol->rho_th <= 0)
-      pol->rho_th = DLLIFTING_DEFAULT_RHO_TH;
+      pol->rho_th = DPLIFTING_DEFAULT_RHO_TH;
    if(pol->beta_th <= 0)
-      pol->beta_th = DLLIFTING_DEFAULT_BETA_TH;
+      pol->beta_th = DPLIFTING_DEFAULT_BETA_TH;
    if(pol->u_bar_th <= 0)
-      pol->u_bar_th = DLLIFTING_DEFAULT_UBAR_TH;
+      pol->u_bar_th = DPLIFTING_DEFAULT_UBAR_TH;
 }
 
-int dllifting_select_backend(const DLLiftingFeatures* feat, const DLLiftingPolicy* pol)
+int dplifting_select_backend(const DPLiftingFeatures* feat, const DPLiftingPolicy* pol)
 {
-   DLLiftingPolicy local;
+   DPLiftingPolicy local;
    if(!pol)
-      dllifting_policy_default(&local);
+      dplifting_policy_default(&local);
    else
    {
       local = *pol;
-      dllifting_policy_fill(&local);
+      dplifting_policy_fill(&local);
    }
    pol = &local;
 
@@ -114,24 +114,24 @@ int dllifting_select_backend(const DLLiftingFeatures* feat, const DLLiftingPolic
    const double beta = feat ? feat->beta : 0.0;
    const double ubar = feat ? feat->u_bar : 0.0;
 
-   if(ubar > 0 && ubar <= pol->u_bar_th + EPS_DL)
-      return DLLIFTING_MODE_DL;
-   if(rho >= pol->rho_th - EPS_DL)
-      return DLLIFTING_MODE_DL;
-   if(pol->prefer_dl_fuzzy)
+   if(ubar > 0 && ubar <= pol->u_bar_th + EPS_DPL)
+      return DPLIFTING_MODE_DPL;
+   if(rho >= pol->rho_th - EPS_DPL)
+      return DPLIFTING_MODE_DPL;
+   if(pol->prefer_dpl_fuzzy)
    {
       const double band = 0.10;
       if(fabs(rho - pol->rho_th) <= band * pol->rho_th)
-         return DLLIFTING_MODE_DL;
+         return DPLIFTING_MODE_DPL;
       if(fabs(beta - pol->beta_th) <= band * pol->beta_th)
-         return DLLIFTING_MODE_DL;
+         return DPLIFTING_MODE_DPL;
    }
-   if(beta < pol->beta_th - EPS_DL)
-      return DLLIFTING_MODE_DL;
-   return DLLIFTING_MODE_DP;
+   if(beta < pol->beta_th - EPS_DPL)
+      return DPLIFTING_MODE_DPL;
+   return DPLIFTING_MODE_DPT;
 }
 
-double Lifting_bar_b(const DLLifting* lift)
+double Lifting_bar_b(const DPLifting* lift)
 {
    if(!lift)
       return 0.0;
@@ -145,29 +145,29 @@ double Lifting_bar_b(const DLLifting* lift)
    return b;
 }
 
-/** τ > bar b → prefer DP (0); τ < bar b → prefer DL (1). */
-static int Lifting_prefer_dl_from_barb(const DLLifting* lift)
+/** τ > bar b → prefer DPT (0); τ < bar b → prefer DPL (1). */
+static int Lifting_prefer_dpl_from_barb(const DPLifting* lift)
 {
    const double barb = Lifting_bar_b(lift);
    double tau = lift->switch_cap > 0 ? lift->switch_cap : lift->threshold;
-   if(tau > barb + EPS_DL)
+   if(tau > barb + EPS_DPL)
       return 0;
-   if(tau + EPS_DL < barb)
+   if(tau + EPS_DPL < barb)
       return 1;
-   return lift->isDL ? 1 : 0;
+   return lift->isDPL ? 1 : 0;
 }
 
-/** MODE_THRESHOLD mid-lift: switch DL↔DP for one binary-split chunk. */
-static void Lifting_add_chunk(DLLifting* lift, DTptype p, DTwtype ww, int geq_path)
+/** MODE_THRESHOLD mid-lift: switch DPL↔DPT for one binary-split chunk. */
+static void Lifting_add_chunk(DPLifting* lift, DTptype p, DTwtype ww, int geq_path)
 {
-   const int thr_mode = (lift->force_mode == DLLIFTING_MODE_THRESHOLD);
-   if(lift->isDL)
+   const int thr_mode = (lift->force_mode == DPLIFTING_MODE_THRESHOLD);
+   if(lift->isDPL)
    {
-      if(thr_mode && !Lifting_prefer_dl_from_barb(lift))
+      if(thr_mode && !Lifting_prefer_dpl_from_barb(lift))
       {
          Lifting_Expand(lift);
-         Lifting_DPiter(lift, FLOOR_INT(ww), p);
-         lift->isDL = 0;
+         Lifting_DPTiter(lift, FLOOR_INT(ww), p);
+         lift->isDPL = 0;
       }
       else if(geq_path)
          Lifting_update(lift, FLOOR_INT(ww), p, 0);
@@ -176,55 +176,55 @@ static void Lifting_add_chunk(DLLifting* lift, DTptype p, DTwtype ww, int geq_pa
    }
    else
    {
-      if(thr_mode && Lifting_prefer_dl_from_barb(lift))
+      if(thr_mode && Lifting_prefer_dpl_from_barb(lift))
       {
          Lifting_Compress(lift, 0);
          Lifting_Mergesort(lift, p, ww);
-         lift->isDL = 1;
+         lift->isDPL = 1;
       }
       else
-         Lifting_DPiter(lift, FLOOR_INT(ww), p);
+         Lifting_DPTiter(lift, FLOOR_INT(ww), p);
    }
 }
 
-static void Lifting_resolve_tau(DLLifting* lift, double threshold, double w_mean)
+static void Lifting_resolve_tau(DPLifting* lift, double threshold, double w_mean)
 {
    if(threshold > 0)
       lift->switch_cap = threshold;
    else
-      lift->switch_cap = lift->beta_th * (w_mean > EPS_DL ? w_mean : 1.0);
+      lift->switch_cap = lift->beta_th * (w_mean > EPS_DPL ? w_mean : 1.0);
    lift->threshold = lift->switch_cap;
 }
 
-static void Lifting_apply_isdl_mode(DLLifting* lift, int isdl_mode,
-      const DLLiftingFeatures* feat, const DLLiftingPolicy* pol, double cap)
+static void Lifting_apply_isdpl_mode(DPLifting* lift, int isdpl_mode,
+      const DPLiftingFeatures* feat, const DPLiftingPolicy* pol, double cap)
 {
-   if(isdl_mode == DLLIFTING_MODE_DP)
+   if(isdpl_mode == DPLIFTING_MODE_DPT)
    {
-      lift->force_mode = DLLIFTING_MODE_DP;
-      lift->isDL = 0;
+      lift->force_mode = DPLIFTING_MODE_DPT;
+      lift->isDPL = 0;
    }
-   else if(isdl_mode == DLLIFTING_MODE_DL)
+   else if(isdpl_mode == DPLIFTING_MODE_DPL)
    {
-      lift->force_mode = DLLIFTING_MODE_DL;
-      lift->isDL = 1;
+      lift->force_mode = DPLIFTING_MODE_DPL;
+      lift->isDPL = 1;
    }
-   else if(isdl_mode == DLLIFTING_MODE_THRESHOLD)
+   else if(isdpl_mode == DPLIFTING_MODE_THRESHOLD)
    {
-      lift->force_mode = DLLIFTING_MODE_THRESHOLD;
-      lift->isDL = (cap > lift->switch_cap + EPS_DL) ? 1 : 0;
+      lift->force_mode = DPLIFTING_MODE_THRESHOLD;
+      lift->isDPL = (cap > lift->switch_cap + EPS_DPL) ? 1 : 0;
    }
    else
    {
-      lift->force_mode = DLLIFTING_MODE_AUTO;
-      lift->isDL = (dllifting_select_backend(feat, pol) == DLLIFTING_MODE_DL) ? 1 : 0;
+      lift->force_mode = DPLIFTING_MODE_AUTO;
+      lift->isDPL = (dplifting_select_backend(feat, pol) == DPLIFTING_MODE_DPL) ? 1 : 0;
    }
 }
 
 #ifdef REDUCTION
 // U^k = tableleft; b^k = subcap; bar b^k = min(subcap, U^k).  Slack m = max(0, subcap - U^k).
 // When U^k > subcap the table is truncated to subcap (bar b^k = subcap); do not zero U^k.
-static int Lifting_reduction(DLLifting* lift, double* m_out)
+static int Lifting_reduction(DPLifting* lift, double* m_out)
 {
    if(!lift->reduction_active)
       return 0;
@@ -237,7 +237,7 @@ static int Lifting_reduction(DLLifting* lift, double* m_out)
    return 1;
 }
 
-static double Lifting_reduction_floor(const DLLifting* lift, double floor_w)
+static double Lifting_reduction_floor(const DPLifting* lift, double floor_w)
 {
    if(!lift->reduction_active || lift->tableleft <= 0 || lift->subcap <= 0)
       return floor_w;
@@ -245,7 +245,7 @@ static double Lifting_reduction_floor(const DLLifting* lift, double floor_w)
    return m > floor_w ? m : floor_w;
 }
 
-static int Lifting_reduction_start(const DLLifting* lift, int floor_j)
+static int Lifting_reduction_start(const DPLifting* lift, int floor_j)
 {
    if(!lift->reduction_active || lift->tableleft <= 0 || lift->subcap <= 0)
       return floor_j;
@@ -256,14 +256,14 @@ static int Lifting_reduction_start(const DLLifting* lift, int floor_j)
    return mb > floor_j ? mb : floor_j;
 }
 
-static void Lifting_record_reduction_init(DLLifting* lift)
+static void Lifting_record_reduction_init(DPLifting* lift)
 {
    lift->reduction_U_init = lift->tableleft;
    lift->reduction_b_init = lift->subcap;
    lift->reduction_usable = (lift->tableleft > 0 && lift->subcap > 0) ? 1 : 0;
 }
 
-static double Lifting_length(const DLLifting* lift, int i)
+static double Lifting_length(const DPLifting* lift, int i)
 {
    if(Lifting_unbounded(lift, lift->w[i], lift->u[i]))
       return 0.0;
@@ -272,14 +272,14 @@ static double Lifting_length(const DLLifting* lift, int i)
 #endif
 
 
-/* Min p-cost to cover residual demand `cap` on the current geq DP/DL table.
+/* Min p-cost to cover residual demand `cap` on the current geq DPT/DPL table.
  * Residual queries must NOT be clamped to the original RHS (minweight): that
  * made Up-lifting see dp[b] for every b-ja < b and forced alpha=0. */
-static DTptype Lifting_Geqfind(DLLifting* lift, DTctype cap)
+static DTptype Lifting_Geqfind(DPLifting* lift, DTctype cap)
 {
    if(cap <= 0)
       return 0.0;
-   if(lift->isDL)
+   if(lift->isDPL)
       Lifting_Expand(lift);
    {
       int q = FLOOR_INT(cap);
@@ -287,39 +287,39 @@ static DTptype Lifting_Geqfind(DLLifting* lift, DTctype cap)
          return 0.0;
       if(q > (int)lift->cap)
          q = (int)lift->cap;
-      return lift->dplist[q];
+      return lift->dptlist[q];
    }
 }
 
 /* Expand -> DPiter(Inf) -> Compress -> Expand. */
-static void Lifting_update(DLLifting* lift, int w, double p, int unbounded)
+static void Lifting_update(DPLifting* lift, int w, double p, int unbounded)
 {
-   if(lift->isDL)
+   if(lift->isDPL)
       Lifting_Expand(lift);
    if(unbounded)
-      Lifting_DPiterInf(lift, w, p);
+      Lifting_DPTiterInf(lift, w, p);
    else
-      Lifting_DPiter(lift, w, p);
-   if(lift->isDL)
+      Lifting_DPTiter(lift, w, p);
+   if(lift->isDPL)
    {
-      /* Keep DL authoritative: MODE_DL, MODE_AUTO, or MODE_THRESHOLD while τ says DL. */
-      if(lift->force_mode == DLLIFTING_MODE_DL ||
-            lift->force_mode == DLLIFTING_MODE_AUTO ||
-            (lift->force_mode == DLLIFTING_MODE_THRESHOLD && Lifting_prefer_dl_from_barb(lift)))
+      /* Keep DPL authoritative: MODE_DPL, MODE_AUTO, or MODE_THRESHOLD while τ says DPL. */
+      if(lift->force_mode == DPLIFTING_MODE_DPL ||
+            lift->force_mode == DPLIFTING_MODE_AUTO ||
+            (lift->force_mode == DPLIFTING_MODE_THRESHOLD && Lifting_prefer_dpl_from_barb(lift)))
       {
          Lifting_Compress(lift, 0);
          Lifting_Expand(lift);
       }
-      else if(lift->force_mode == DLLIFTING_MODE_THRESHOLD)
-         lift->isDL = 0;
+      else if(lift->force_mode == DPLIFTING_MODE_THRESHOLD)
+         lift->isDPL = 0;
    }
 }
 
-// knapsack DP kernels
-void Lifting_DPiterInf(DLLifting* lift, int w, double p)
+// knapsack DPT kernels
+void Lifting_DPTiterInf(DPLifting* lift, int w, double p)
 {
    int c = FLOOR_INT(lift->cap);
-   double* dp = lift->dplist;
+   double* dp = lift->dptlist;
 #ifdef DLTIME
    double tmp = Lifting_GetTime();
 #endif
@@ -354,10 +354,10 @@ void Lifting_DPiterInf(DLLifting* lift, int w, double p)
 #endif
 }
 
-void Lifting_DPiter(DLLifting* lift, int w, double p)
+void Lifting_DPTiter(DPLifting* lift, int w, double p)
 {
    int c = FLOOR_INT(lift->cap);
-   double* dp = lift->dplist;
+   double* dp = lift->dptlist;
 #ifdef DLTIME
    double tmp = Lifting_GetTime();
 #endif
@@ -388,7 +388,7 @@ void Lifting_DPiter(DLLifting* lift, int w, double p)
    {
       /* Bounded >= cover: one 0-1 item (weight w, cost p) into min-cost-to-cover-at-least-j.
        * Forward dp[j]=dp[j-w]+p would allow unbounded reuse of this copy — wrong.
-       * Scratch = second half of dplist (size 2*maxsolsize from Alloc). */
+       * Scratch = second half of dptlist (size 2*maxsolsize from Alloc). */
       double* old = dp + lift->maxsolsize;
       int jstart = 0;
       for(j = 0; j <= c; j++)
@@ -401,7 +401,7 @@ void Lifting_DPiter(DLLifting* lift, int w, double p)
          double cand;
          if(j <= w)
             cand = p; /* remaining demand 0 */
-         else if(old[j - w] >= INF_DL / 2)
+         else if(old[j - w] >= INF_DPL / 2)
             continue;
          else
             cand = p + old[j - w];
@@ -414,17 +414,17 @@ void Lifting_DPiter(DLLifting* lift, int w, double p)
 #endif
 }
 
-void Lifting_Print(DLLifting* lift)
+void Lifting_Print(DPLifting* lift)
 {
-   if(lift->isDL)
+   if(lift->isDPL)
       Lifting_Printsum(lift);
    else
-      Lifting_DPPrint(lift->dplist, lift->cap);
+      Lifting_DPTPrint(lift->dptlist, lift->cap);
 }
 
-void Lifting_DPPrint(double* dp, int c)
+void Lifting_DPTPrint(double* dp, int c)
 {
-#ifdef DLLIFTING_DEBUG
+#ifdef DPLIFTING_DEBUG
    double p = dp[0];
    int i = 0;
    printf( "w = 0, p = %.1f\n", p);
@@ -443,14 +443,14 @@ void Lifting_DPPrint(double* dp, int c)
 #endif
 }
 
-void Lifting_DPFree(double* dp)
+void Lifting_DPTFree(double* dp)
 {
    free(dp);
 }
 
-void Lifting_Printsum(DLLifting* lift)
+void Lifting_Printsum(DPLifting* lift)
 {
-#ifdef DLLIFTING_DEBUG
+#ifdef DPLIFTING_DEBUG
    int i = 0;
    printf("len: %d\n", lift->n_soltable);
    for(i = 0; i<lift->n_soltable; i++)
@@ -463,7 +463,7 @@ void Lifting_Printsum(DLLifting* lift)
 #endif
 }
 
-void Lifting_Check(DLLifting* lift)
+void Lifting_Check(DPLifting* lift)
 {
    int i = 0;
    for(i = 1; i<lift->n_soltable; i++)
@@ -474,13 +474,13 @@ void Lifting_Check(DLLifting* lift)
 }
 
 
-int Lifting_Alloc(DLLifting* lift, int len, int scale, double threshold)
+int Lifting_Alloc(DPLifting* lift, int len, int scale, double threshold)
 {
    (void)scale;
    len = len+1;
    // Do not cap at INITSIZE_LIFTING: silent truncation caused buffer overruns when
    // b (or variable upper bounds) exceed 5e6 on the lambda benchmark grid.
-   if(lift->dplist != nullptr || lift->psum1 != nullptr)
+   if(lift->dptlist != nullptr || lift->psum1 != nullptr)
       Lifting_Free(lift);
    if(sizeof(DTptype) !=  sizeof(DTwtype))
    {
@@ -507,18 +507,18 @@ int Lifting_Alloc(DLLifting* lift, int len, int scale, double threshold)
    lift->psum = lift->psum1;
    lift->wsum = lift->wsum1;
 
-   lift->dplist = (double*) malloc ( (2* len)*sizeof(double)) ;
-   if(lift->dplist == nullptr)
+   lift->dptlist = (double*) malloc ( (2* len)*sizeof(double)) ;
+   if(lift->dptlist == nullptr)
       return 0;
-   /* Initial isDL overwritten by lifting() for AUTO/forced modes. */
-   lift->isDL = 1;
+   /* Initial isDPL overwritten by lifting() for AUTO/forced modes. */
+   lift->isDPL = 1;
    lift->threshold = threshold;
    lift->switch_cap = threshold;
    lift->maxsolsize = len; 
    return 1;
 }
 
-int Lifting_Realloc(DLLifting* lift, int len)
+int Lifting_Realloc(DPLifting* lift, int len)
 {
    DTptype* psum1;
    DTwtype* wsum1;
@@ -559,12 +559,12 @@ int Lifting_Realloc(DLLifting* lift, int len)
    lift->wsum1 = wsum1;
    lift->wsum2 = wsum2;
    lift->maxsolsize = len;
-   DLLIFTING_LOG("realloc len = %d\n", len);
+   DPLIFTING_LOG("realloc len = %d\n", len);
    return 1;
 }
 
 // Reset dominated lists
-int Lifting_Reset(DLLifting* lift, int len)
+int Lifting_Reset(DPLifting* lift, int len)
 {
    (void)len;
    lift->n_soltable = 1;
@@ -577,22 +577,22 @@ int Lifting_Reset(DLLifting* lift, int len)
    {
       for(i = 0; i<=lift->cap; i++)
       {
-         lift->dplist[i] = 0;
+         lift->dptlist[i] = 0;
       }
    }
    else
    {
-      lift->dplist[0] = 0;
+      lift->dptlist[0] = 0;
       for(i = 1; i<=lift->cap; i++)
-         lift->dplist[i] = INF_DL;
+         lift->dptlist[i] = INF_DPL;
    }
    return 1; 
 }
 
-int Lifting_Free(DLLifting* lift)
+int Lifting_Free(DPLifting* lift)
 {
-   Lifting_DPFree(lift->dplist);
-   lift->dplist = nullptr;
+   Lifting_DPTFree(lift->dptlist);
+   lift->dptlist = nullptr;
    if(sizeof(DTptype) !=  sizeof(DTwtype))
    {
       if(lift->psum1 != nullptr)
@@ -611,7 +611,7 @@ int Lifting_Free(DLLifting* lift)
    return 1;
 }
 
-int Lifting_Calsubcap(DLLifting* lift)
+int Lifting_Calsubcap(DPLifting* lift)
 {
    int i = 0;
    lift->subcap = lift->cap;
@@ -641,7 +641,7 @@ int Lifting_Calsubcap(DLLifting* lift)
 }
 
 
-int Lifting_Calcap(DLLifting* lift)
+int Lifting_Calcap(DPLifting* lift)
 {
    int i = 0;
    lift->cap = lift->subcap;
@@ -668,7 +668,7 @@ int Lifting_Calcap(DLLifting* lift)
    return 1;
 }
 
-int Lifting_Wiszero(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
+int Lifting_Wiszero(DPLifting* lift, DTptype p, DTwtype w, DTutype u)
 {
    (void)w;
    if(ISZERO(p))
@@ -678,7 +678,7 @@ int Lifting_Wiszero(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
       if(ISINF(u))
       {
          lift->wsum[0] = 0;
-         lift->psum[0] = INF_DL;
+         lift->psum[0] = INF_DPL;
          lift->n_soltable = 1;
       }
       else
@@ -691,15 +691,15 @@ int Lifting_Wiszero(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
    return 1;
 }
 
-int Lifting_Piszero(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
+int Lifting_Piszero(DPLifting* lift, DTptype p, DTwtype w, DTutype u)
 {
    if(ISZERO(w))
       return 1;
    if(lift->isleq == 0)
    {
-      /* Zero-profit items still contribute weight. Always apply via the DP
-       * 0-1 update (Lifting_update / DPiter): shifting DL wsum would drop the
-       * zero-weight empty cover and disagree with the DP table. */
+      /* Zero-profit items still contribute weight. Always apply via the DPT
+       * 0-1 update (Lifting_update / DPiter): shifting DPL wsum would drop the
+       * zero-weight empty cover and disagree with the DPT table. */
       DTutype k;
       DTutype uu = u;
       if(Lifting_unbounded(lift, w, u))
@@ -721,8 +721,8 @@ int Lifting_Piszero(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
    return 1;
 }
 
-// Merge one bounded item into the DL table.
-int Lifting_Mergesort(DLLifting* lift, DTptype p, DTwtype w)
+// Merge one bounded item into the DPL table.
+int Lifting_Mergesort(DPLifting* lift, DTptype p, DTwtype w)
 {
    int i = 0, j = 0, k = 0;
    DTptype* oldpsum = nullptr;
@@ -767,7 +767,7 @@ int Lifting_Mergesort(DLLifting* lift, DTptype p, DTwtype w)
             if(ISGT(oldpsum[i], newpsum[k]))
             {
 #ifdef REDUCTION 
-               if(ISGT(oldwsum[i], newwsum[k]) && (!use_red || oldwsum[i] >= m - EPS_DL))
+               if(ISGT(oldwsum[i], newwsum[k]) && (!use_red || oldwsum[i] >= m - EPS_DPL))
 #else
                   if(ISGT(oldwsum[i], newwsum[k]))
 #endif
@@ -782,7 +782,7 @@ int Lifting_Mergesort(DLLifting* lift, DTptype p, DTwtype w)
             if(ISGT(tmppsum, newpsum[k]))
             {
 #ifdef REDUCTION 
-               if(ISGT(tmpwsum, newwsum[k]) && (!use_red || tmpwsum >= m - EPS_DL))
+               if(ISGT(tmpwsum, newwsum[k]) && (!use_red || tmpwsum >= m - EPS_DPL))
 #else
                   if(ISGT(tmpwsum, newwsum[k]))
 #endif
@@ -800,7 +800,7 @@ int Lifting_Mergesort(DLLifting* lift, DTptype p, DTwtype w)
          if(ISGT(tmppsum, newpsum[k]))
          {
 #ifdef REDUCTION 
-            if(ISGT(tmpwsum, newwsum[k]) && (!use_red || tmpwsum >= m - EPS_DL))
+            if(ISGT(tmpwsum, newwsum[k]) && (!use_red || tmpwsum >= m - EPS_DPL))
 #else
                if(ISGT(tmpwsum, newwsum[k]))
 #endif
@@ -840,7 +840,7 @@ int Lifting_Mergesort(DLLifting* lift, DTptype p, DTwtype w)
             if(ISLT(oldpsum[i], newpsum[k]))
             {
 #ifdef REDUCTION 
-               if(ISGT(oldwsum[i], newwsum[k]) && (!use_red || oldwsum[i] >= m - EPS_DL))
+               if(ISGT(oldwsum[i], newwsum[k]) && (!use_red || oldwsum[i] >= m - EPS_DPL))
 #else
                if(ISGT(oldwsum[i], newwsum[k]))
 #endif
@@ -855,7 +855,7 @@ int Lifting_Mergesort(DLLifting* lift, DTptype p, DTwtype w)
             if(ISGT(tmpwsum, newwsum[k]) || ISLT(tmppsum, newpsum[k]))
             {
 #ifdef REDUCTION 
-               if(ISGT(tmpwsum, newwsum[k]) && (!use_red || tmpwsum >= m - EPS_DL))
+               if(ISGT(tmpwsum, newwsum[k]) && (!use_red || tmpwsum >= m - EPS_DPL))
 #else
                if(ISGT(tmpwsum, newwsum[k]))
 #endif
@@ -873,7 +873,7 @@ int Lifting_Mergesort(DLLifting* lift, DTptype p, DTwtype w)
          if(ISGT(tmpwsum, newwsum[k]) || ISLT(tmppsum, newpsum[k]))
          {
 #ifdef REDUCTION 
-            if(ISGT(tmpwsum, newwsum[k]) && (!use_red || tmpwsum >= m - EPS_DL))
+            if(ISGT(tmpwsum, newwsum[k]) && (!use_red || tmpwsum >= m - EPS_DPL))
 #else
             if(ISGT(tmpwsum, newwsum[k]))
 #endif
@@ -896,7 +896,7 @@ int Lifting_Mergesort(DLLifting* lift, DTptype p, DTwtype w)
    return 1;
 }
 
-int Lifting_Mergesortinf(DLLifting* lift, DTptype p, DTwtype w)
+int Lifting_Mergesortinf(DPLifting* lift, DTptype p, DTwtype w)
 {
    int i = 0, j = 0, k = 0;
    DTptype* oldpsum = nullptr;
@@ -1043,8 +1043,8 @@ int Lifting_Mergesortinf(DLLifting* lift, DTptype p, DTwtype w)
    return 1;
 }
 
-// Add item (p,w,u) with binary splitting; large-u items use unbounded DP.
-int Lifting_Multiply(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
+// Add item (p,w,u) with binary splitting; large-u items use unbounded DPT.
+int Lifting_Multiply(DPLifting* lift, DTptype p, DTwtype w, DTutype u)
 {
    DTutype k; 
    if (lift->n_soltable == 0) 
@@ -1065,11 +1065,11 @@ int Lifting_Multiply(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
    {
       if( Lifting_unbounded(lift, w, u) )
       {
-         /* DP path maintains dplist; refresh psum before unbounded DL merge. */
-         if(!lift->isDL)
+         /* DPT path maintains dptlist; refresh psum before unbounded DPL merge. */
+         if(!lift->isDPL)
             Lifting_Compress(lift, 0);
          Lifting_Mergesortinf(lift, p, w);
-         if(!lift->isDL)
+         if(!lift->isDPL)
             Lifting_Expand(lift);
       }
       else
@@ -1104,7 +1104,7 @@ int Lifting_Multiply(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
    return 1;
 }
 
-int Lifting_Findind(DLLifting* lift, DTctype cap, int begin, int end, int isleq)
+int Lifting_Findind(DPLifting* lift, DTctype cap, int begin, int end, int isleq)
 {
    int i = begin, j = end, m = i;
    if( isleq )
@@ -1141,16 +1141,16 @@ int Lifting_Findind(DLLifting* lift, DTctype cap, int begin, int end, int isleq)
 }
 
 // Find the solution 
-DTptype Lifting_Findsol(DLLifting* lift, DTctype cap, int begin, int end, int isleq)
+DTptype Lifting_Findsol(DPLifting* lift, DTctype cap, int begin, int end, int isleq)
 {
    int ind = Lifting_Findind(lift, cap, begin, end, isleq);
    if( ind == -1)
-      return INF_DL;
+      return INF_DPL;
    return lift->psum[ind];
 }
 
 // Build seed table from seed items and return initial cover rhs.
-DTptype Lifting_Calinitrhs(DLLifting* lift)
+DTptype Lifting_Calinitrhs(DPLifting* lift)
 {
    int i = 0;
 
@@ -1166,14 +1166,14 @@ DTptype Lifting_Calinitrhs(DLLifting* lift)
    if(lift->isleq)
    {
       DTctype qcap = lift->subcap;
-      if(lift->isDL)
+      if(lift->isDPL)
       {
          i = Lifting_Findind(lift, qcap, 0, lift->n_soltable-1, 1);
          if( i == -1)
-            return INF_DL;
+            return INF_DPL;
          return lift->psum[i];
       }
-      return lift->dplist[FLOOR_INT(qcap)];
+      return lift->dptlist[FLOOR_INT(qcap)];
    }
    return Lifting_Geqfind(lift, lift->subcap);
 }
@@ -1213,7 +1213,7 @@ int Lifting_Init(
             break;
          }
       }
-      if(lift->reduction_request == DLLIFTING_RED_OFF || any_unb)
+      if(lift->reduction_request == DPLIFTING_RED_OFF || any_unb)
          lift->reduction_active = 0;
       else
          /* ON or AUTO: accumulate tableleft in Calsubcap; AUTO refined below. */
@@ -1237,13 +1237,13 @@ int Lifting_Init(
    }
 #ifdef REDUCTION
    /* +R AUTO: same mid-lift rule — large residual (bar b > τ) enables reduction. */
-   if(lift->reduction_request == DLLIFTING_RED_AUTO && lift->reduction_active)
+   if(lift->reduction_request == DPLIFTING_RED_AUTO && lift->reduction_active)
    {
       double tau = lift->switch_cap;
       if(tau <= 0)
          tau = lift->threshold;
       double barb = Lifting_bar_b(lift);
-      lift->reduction_active = (barb > tau + EPS_DL) ? 1 : 0;
+      lift->reduction_active = (barb > tau + EPS_DPL) ? 1 : 0;
    }
    Lifting_record_reduction_init(lift);
 #else
@@ -1274,22 +1274,22 @@ int Lifting_Init(
    return 1;
 }
 
-int Lifting_Iter(DLLifting* lift, DTptype p, DTwtype w, DTutype u)
+int Lifting_Iter(DPLifting* lift, DTptype p, DTwtype w, DTutype u)
 {
    Lifting_Multiply(lift, p, w, u); 
    return 1;
 }
 
 // Up lifting 
-int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *rhs)
+int Lifting_Up(DPLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *rhs)
 {
    int solind = -1, j = 1, u0;
    double temp;
    if(lift->isleq)
    {
-      *alpha = INF_DL; 
+      *alpha = INF_DPL; 
       solind = lift->n_soltable - 1;
-      u0 = FLOOR_INT( MIN_DL(u, lift->subcap*1.0/a) ); 
+      u0 = FLOOR_INT( MIN_DPL(u, lift->subcap*1.0/a) ); 
 
       if(u0 == 0)
          *alpha = 0;
@@ -1297,7 +1297,7 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
       {
          for( j = 1; j <= u0; j++)
          {
-            if(lift->isDL)
+            if(lift->isDPL)
             {
 #ifdef DLTIME
                double tmp = Lifting_GetTime();
@@ -1315,10 +1315,10 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
             {
 #ifdef REDUCTION
                double rm;
-               if(Lifting_reduction(lift, &rm) && lift->subcap - j * a < rm - EPS_DL)
+               if(Lifting_reduction(lift, &rm) && lift->subcap - j * a < rm - EPS_DPL)
                   continue;
 #endif
-               temp = (*rhs - lift->dplist[FLOOR_INT(lift->subcap - j*a)])/j;
+               temp = (*rhs - lift->dptlist[FLOOR_INT(lift->subcap - j*a)])/j;
             }
             if( temp < *alpha)
             {
@@ -1329,7 +1329,7 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
 
       if( ISZERO(*alpha) )
          *alpha = 0;
-      if(!(*alpha >= 0 && *alpha < INF_DL/10))
+      if(!(*alpha >= 0 && *alpha < INF_DPL/10))
          return 0;
       Lifting_Iter(lift, *alpha, a, u);
    }
@@ -1339,7 +1339,7 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
        * Always multiply into the table (even alpha=0): zero-coeff items still
        * contribute weight and must update z(·) for later variables. */
       *alpha = 0; 
-      u0 = CEIL_INT( MIN_DL( u, lift->subcap*1.0/a) ); 
+      u0 = CEIL_INT( MIN_DPL( u, lift->subcap*1.0/a) ); 
       if(u0 <= 0)
          return 0;
       for( j = 1; j<=u0; j++)
@@ -1348,14 +1348,14 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
             temp = (*rhs)/j;
          else
             temp = (*rhs - Lifting_Geqfind(lift, lift->subcap - j*a))/j;
-         if(temp >= INF_DL / 10 || temp < -EPS_DL)
+         if(temp >= INF_DPL / 10 || temp < -EPS_DPL)
             continue;
          if( temp > *alpha)
             *alpha = temp;
       }
       if(ISZERO(*alpha))
          *alpha = 0;
-      if(!(*alpha >= 0 && *alpha < INF_DL/10))
+      if(!(*alpha >= 0 && *alpha < INF_DPL/10))
          return 0;
       Lifting_Iter(lift, *alpha, a, u); 
    }
@@ -1363,21 +1363,21 @@ int Lifting_Up(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *r
 }
 
 // Down lifting
-int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *rhs)
+int Lifting_Down(DPLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype *rhs)
 {
    int solind = -1, j = 1, u0;
    double temp;
    if(lift->isleq)
    {
-      *alpha = -INF_DL; 
-      u0 = CEIL_INT( MIN_DL( u, (lift->cap - lift->subcap)*1.0/a) ); 
+      *alpha = -INF_DPL; 
+      u0 = CEIL_INT( MIN_DPL( u, (lift->cap - lift->subcap)*1.0/a) ); 
       solind = 0;
       if(u0 <= 0)
          return 0;
 
       for( j = 1; j<=u0; j++)
       {
-         if(lift->isDL)
+         if(lift->isDPL)
          {
 #ifdef DLTIME
             double tmp = Lifting_GetTime();
@@ -1401,7 +1401,7 @@ int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype 
                   continue;
             }
 #endif
-            temp = (lift->dplist[FLOOR_INT(lift->subcap + j*a)] - *rhs)/j;
+            temp = (lift->dptlist[FLOOR_INT(lift->subcap + j*a)] - *rhs)/j;
          }
          if( temp > *alpha)
             *alpha = temp;
@@ -1409,14 +1409,14 @@ int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype 
       lift->subcap = lift->subcap + a*u;
       *rhs = *rhs + *alpha*u;
 
-      if(!(*alpha >= 0 && *alpha < INF_DL/10))
+      if(!(*alpha >= 0 && *alpha < INF_DPL/10))
          return 0;
       Lifting_Multiply(lift, *alpha, a, u); 
    }
    else
    {
-      *alpha = INF_DL; 
-      u0 = FLOOR_INT( MIN_DL( u, (lift->cap - lift->subcap)*1.0/a) ); 
+      *alpha = INF_DPL; 
+      u0 = FLOOR_INT( MIN_DPL( u, (lift->cap - lift->subcap)*1.0/a) ); 
       solind = 0;
       if(u0 == 0)
       {
@@ -1427,7 +1427,7 @@ int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype 
          for( j = 1; j<=u0; j++)
          {
             double dpv = Lifting_Geqfind(lift, lift->subcap + j*a);
-            if(dpv >= INF_DL/2)
+            if(dpv >= INF_DPL/2)
                temp = 0;  
             else
                temp = (dpv - *rhs)/j;
@@ -1439,7 +1439,7 @@ int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype 
       *rhs = *rhs + *alpha*u;
       if(ISZERO(*alpha))
          *alpha = 0;
-      if(!(*alpha >= 0 && *alpha < INF_DL/10))
+      if(!(*alpha >= 0 && *alpha < INF_DPL/10))
          return 0;
       /* Always update table: alpha=0 items still change residual weight. */
       Lifting_Multiply(lift, *alpha, a, u); 
@@ -1447,19 +1447,19 @@ int Lifting_Down(DLLifting* lift, DTptype* alpha, DTwtype a, DTutype u, DTptype 
    return 1;
 }
 
-// DP to DL
-int Lifting_Compress(DLLifting* lift, int begin)
+// DPT to DPL
+int Lifting_Compress(DPLifting* lift, int begin)
 {
    int i = begin;
-   double p = lift->dplist[i];
+   double p = lift->dptlist[i];
    int k = 1;
    lift->wsum[0] = begin;
    lift->psum[0] = p;
    for(; i<=lift->cap; i++)
    {
-      if(!ISEQ(lift->dplist[i], p))
+      if(!ISEQ(lift->dptlist[i], p))
       {
-         p = lift->dplist[i];
+         p = lift->dptlist[i];
          lift->wsum[k] = i;
          lift->psum[k] = p;
          k++;
@@ -1469,18 +1469,18 @@ int Lifting_Compress(DLLifting* lift, int begin)
    return 1;
 }
 
-// DL to DP
-int Lifting_Expand(DLLifting* lift)
+// DPL to DPT
+int Lifting_Expand(DPLifting* lift)
 {
    int j;
    int k;
    if(lift->isleq == 0)
    {
       for(j = 0; j <= (int)lift->cap; j++)
-         lift->dplist[j] = INF_DL;
+         lift->dptlist[j] = INF_DPL;
       if(lift->n_soltable == 1 && ISZERO(lift->wsum[0]) && ISZERO(lift->psum[0]))
       {
-         lift->dplist[0] = 0.0;
+         lift->dptlist[0] = 0.0;
          return 1;
       }
    }
@@ -1492,12 +1492,12 @@ int Lifting_Expand(DLLifting* lift)
       {
          for(; j < lift->wsum[k+1]; j++)
          {
-            lift->dplist[j] = lift->psum[k];
+            lift->dptlist[j] = lift->psum[k];
          }
       }
       for(; j <= lift->cap; j++)
       {
-         lift->dplist[j] = lift->psum[k];
+         lift->dptlist[j] = lift->psum[k];
       }
       return 1;
    }
@@ -1507,18 +1507,18 @@ int Lifting_Expand(DLLifting* lift)
    {
       for(; j < lift->wsum[k+1]; j++)
       {
-         lift->dplist[j] = lift->psum[k];
+         lift->dptlist[j] = lift->psum[k];
       }
    }
    for(; j <= lift->cap; j++)
    {
-      lift->dplist[j] = lift->psum[k];
+      lift->dptlist[j] = lift->psum[k];
    }
    return 1;
 }
 
 // Sequential up- / down-lifting along liftingorder.
-int Lifting_Lifting(DLLifting* lift, DTptype* rhs)
+int Lifting_Lifting(DPLifting* lift, DTptype* rhs)
 {
    int i = 0;
    for( i = 0; i<lift->n_liftingorder; i++)
@@ -1553,13 +1553,13 @@ int Lifting_Lifting(DLLifting* lift, DTptype* rhs)
 
 // Public driver: allocate tables, initialise, lift seed + order, free. 
 int lifting(
-      DLLifting* lift, 
+      DPLifting* lift, 
       DTptype* p, DTwtype* w, DTutype* u, int* isuseub, 
       DTctype cap, int issubcap, 
       int* seed, int n_seed, 
       int* liftingorder, int n_liftingorder, 
       double* rhs,
-      int isleq, double* x, int n, double threshold, double duration, int isdl_mode)
+      int isleq, double* x, int n, double threshold, double duration, int isdpl_mode)
 {
    if(lift == nullptr)
       return 0;
@@ -1599,8 +1599,8 @@ int lifting(
    }
 
    {
-      DLLiftingPolicy pol;
-      dllifting_policy_default(&pol);
+      DPLiftingPolicy pol;
+      dplifting_policy_default(&pol);
       if(lift->rho_th > 0)
          pol.rho_th = lift->rho_th;
       else
@@ -1614,27 +1614,27 @@ int lifting(
       else
          lift->u_bar_th = pol.u_bar_th;
 
-      DLLiftingFeatures feat;
-      dllifting_compute_features(w, u, n, cap, &feat);
+      DPLiftingFeatures feat;
+      dplifting_compute_features(w, u, n, cap, &feat);
       lift->feat_rho = feat.rho_w;
       lift->feat_beta = feat.beta;
       lift->feat_ubar = feat.u_bar;
 
       Lifting_resolve_tau(lift, threshold, feat.w_mean);
-      Lifting_apply_isdl_mode(lift, isdl_mode, &feat, &pol, cap);
+      Lifting_apply_isdpl_mode(lift, isdpl_mode, &feat, &pol, cap);
    }
 
    Lifting_Init(lift, p, w, u, isuseub, cap, issubcap, seed, n_seed, liftingorder, n_liftingorder, isleq, x, cap, n);
 
-   if(isdl_mode == DLLIFTING_MODE_THRESHOLD)
-      lift->isDL = Lifting_prefer_dl_from_barb(lift) ? 1 : 0;
+   if(isdpl_mode == DPLIFTING_MODE_THRESHOLD)
+      lift->isDPL = Lifting_prefer_dpl_from_barb(lift) ? 1 : 0;
 
    lift->duration = 0;
 
    clock_t startTime = clock();
    lift->rhs = Lifting_Calinitrhs(lift);
    /* Seed set must cover subcap; otherwise init cut is undefined. */
-   if(lift->rhs >= INF_DL / 2 || !(lift->rhs >= 0))
+   if(lift->rhs >= INF_DPL / 2 || !(lift->rhs >= 0))
    {
       Lifting_Free(lift);
       return 0;
@@ -1654,8 +1654,8 @@ int lifting(
    return 1;
 }
 
-/* C ABI wrapper (formerly src/dllifting_c.cpp). */
-int dllifting_lift_cover(
+/* C ABI wrapper (formerly src/dplifting_c.cpp). */
+int dplifting_lift_cover(
       int n,
       double* coef,
       const double* weight,
@@ -1670,16 +1670,16 @@ int dllifting_lift_cover(
       double* rhs,
       int is_leq,
       double threshold,
-      int isdl_mode,
+      int isdpl_mode,
       const double* x_frac)
 {
    if(n <= 0 || coef == nullptr || weight == nullptr || ub == nullptr
          || use_ub == nullptr || rhs == nullptr)
-      return DLLIFTING_ERR_ARGS;
+      return DPLIFTING_ERR_ARGS;
    if(n_seed > 0 && seed == nullptr)
-      return DLLIFTING_ERR_ARGS;
+      return DPLIFTING_ERR_ARGS;
    if(n_order > 0 && lifting_order == nullptr)
-      return DLLIFTING_ERR_ARGS;
+      return DPLIFTING_ERR_ARGS;
 
    double* w = new double[n];
    double* u = new double[n];
@@ -1691,7 +1691,7 @@ int dllifting_lift_cover(
       delete[] w;
       delete[] u;
       delete[] isuseub;
-      return DLLIFTING_ERR_ALLOC;
+      return DPLIFTING_ERR_ALLOC;
    }
 
    for(int i = 0; i < n; i++)
@@ -1709,7 +1709,7 @@ int dllifting_lift_cover(
          delete[] w;
          delete[] u;
          delete[] isuseub;
-         return DLLIFTING_ERR_ALLOC;
+         return DPLIFTING_ERR_ALLOC;
       }
       std::memcpy(seed_mut, seed, (size_t)n_seed * sizeof(int));
    }
@@ -1723,12 +1723,12 @@ int dllifting_lift_cover(
          delete[] w;
          delete[] u;
          delete[] isuseub;
-         return DLLIFTING_ERR_ALLOC;
+         return DPLIFTING_ERR_ALLOC;
       }
       std::memcpy(order_mut, lifting_order, (size_t)n_order * sizeof(int));
    }
 
-   DLLifting lift;
+   DPLifting lift;
    std::memset(&lift, 0, sizeof(lift));
    double rhs_val = 0.0;
    int ok = lifting(
@@ -1749,7 +1749,7 @@ int dllifting_lift_cover(
          n,
          threshold,
          0.0,
-         isdl_mode);
+         isdpl_mode);
 
    delete[] order_mut;
    delete[] seed_mut;
@@ -1758,8 +1758,8 @@ int dllifting_lift_cover(
    delete[] w;
 
    if(!ok)
-      return DLLIFTING_ERR_INTERNAL;
+      return DPLIFTING_ERR_INTERNAL;
 
    *rhs = rhs_val;
-   return DLLIFTING_OK;
+   return DPLIFTING_OK;
 }

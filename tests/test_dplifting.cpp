@@ -1,8 +1,8 @@
 /**
- * Unified validation suite for DLLifting.
- * Covers <=/>= knapsacks, DP/DL tables, and mixed-variable lifting.
+ * Unified validation suite for DPLifting.
+ * Covers <=/>= knapsacks, DPT/DPL tables, and mixed-variable lifting.
  */
-#include <DLLifting.h>
+#include <DPLifting.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -49,7 +49,7 @@ static void ok(const char* msg)
       printf("OK: %s\n", msg);
 }
 
-/* ---------- reference DP ---------- */
+/* ---------- reference DPT ---------- */
 static void ref_dp_leq(int cap, double* dp)
 {
    int j;
@@ -62,7 +62,7 @@ static void ref_dp_leq_add(int cap, double* dp, int w, double p)
    int j;
    if (w <= 0)
       return;
-   /* Match Lifting_DPiter (<=): backward 0/1 update per binary chunk */
+   /* Match Lifting_DPTiter (<=): backward 0/1 update per binary chunk */
    for (j = cap; j >= w; j--) {
       if (dp[j] < dp[j - w] + p)
          dp[j] = dp[j - w] + p;
@@ -74,7 +74,7 @@ static void ref_dp_geq_init(int cap, double* dp)
    int j;
    dp[0] = 0.0;
    for (j = 1; j <= cap; j++)
-      dp[j] = INF_DL;
+      dp[j] = INF_DPL;
 }
 
 static void ref_dp_geq_add(int cap, double* dp, int w, double p)
@@ -91,7 +91,7 @@ static void ref_dp_geq_add(int cap, double* dp, int w, double p)
       double cand;
       if (j <= w)
          cand = p;
-      else if (old[j - w] >= INF_DL / 2)
+      else if (old[j - w] >= INF_DPL / 2)
          continue;
       else
          cand = p + old[j - w];
@@ -127,8 +127,8 @@ static int dp_equal(int cap, const double* a, const double* b)
 
 static double ref_max_p_at_most(int cap, const double* dp, double target)
 {
-   int j, t = (int)floor(target + EPS_DL);
-   double best = -INF_DL;
+   int j, t = (int)floor(target + EPS_DPL);
+   double best = -INF_DPL;
    if (t > cap)
       t = cap;
    if (t < 0)
@@ -142,12 +142,12 @@ static double ref_max_p_at_most(int cap, const double* dp, double target)
 
 static double ref_min_p_at_least(int cap, const double* dp, double target)
 {
-   int j, t = (int)ceil(target - EPS_DL);
-   double best = INF_DL;
+   int j, t = (int)ceil(target - EPS_DPL);
+   double best = INF_DPL;
    if (t < 0)
       t = 0;
    if (t > cap)
-      return INF_DL;
+      return INF_DPL;
    for (j = t; j <= cap; j++) {
       if (dp[j] < best)
          best = dp[j];
@@ -161,7 +161,7 @@ typedef struct {
    int u;
 } Item;
 
-static int setup_lift(DLLifting* lift, int cap, int isleq, double threshold)
+static int setup_lift(DPLifting* lift, int cap, int isleq, double threshold)
 {
    memset(lift, 0, sizeof(*lift));
    lift->isleq = isleq;
@@ -169,7 +169,7 @@ static int setup_lift(DLLifting* lift, int cap, int isleq, double threshold)
    lift->subcap = cap;
    lift->maxcap = cap;
    /* THRESHOLD mode required for mid-lift switching by τ vs bar b */
-   lift->force_mode = DLLIFTING_MODE_THRESHOLD;
+   lift->force_mode = DPLIFTING_MODE_THRESHOLD;
    if (!Lifting_Alloc(lift, cap, 1, threshold))
       return 0;
    lift->switch_cap = threshold;
@@ -178,44 +178,44 @@ static int setup_lift(DLLifting* lift, int cap, int isleq, double threshold)
    return 1;
 }
 
-static void build_items(DLLifting* lift, int isleq, double threshold,
+static void build_items(DPLifting* lift, int isleq, double threshold,
       int n, const Item* items, int force_dp)
 {
    int k;
    if (force_dp)
-      lift->isDL = 0;
+      lift->isDPL = 0;
    else
-      lift->isDL = 1;
+      lift->isDPL = 1;
    for (k = 0; k < n; k++)
       Lifting_Multiply(lift, items[k].p, items[k].w, items[k].u);
 }
 
-static int dl_monotone(const DLLifting* lift, int isleq)
+static int dl_monotone(const DPLifting* lift, int isleq)
 {
    int i;
    for (i = 1; i < lift->n_soltable; i++) {
       if (!ISGT(lift->wsum[i], lift->wsum[i - 1]))
          return 0;
-      /* <= : profit increases on DL; >= exact min-cost can decrease with weight */
+      /* <= : profit increases on DPL; >= exact min-cost can decrease with weight */
       if (isleq && !ISGT(lift->psum[i], lift->psum[i - 1]))
          return 0;
    }
    return 1;
 }
 
-static void print_dl(const DLLifting* lift)
+static void print_dl(const DPLifting* lift)
 {
    int i;
-   printf("    DL n=%d:\n", lift->n_soltable);
+   printf("    DPL n=%d:\n", lift->n_soltable);
    for (i = 0; i < lift->n_soltable; i++)
       printf("      [%d] w=%.2f p=%.2f\n", i, lift->wsum[i], lift->psum[i]);
 }
 
-/* Compare DP built directly vs DP obtained by Expand(DL). */
+/* Compare DPT built directly vs DPT obtained by Expand(DPL). */
 static void test_dp_dl_table_agree(const char* tag, int isleq, int cap,
       int n, const Item* items, double threshold)
 {
-   DLLifting lift_dl, lift_dp;
+   DPLifting lift_dl, lift_dp;
    double ref[256];
    int k, j;
 
@@ -244,21 +244,21 @@ static void test_dp_dl_table_agree(const char* tag, int isleq, int cap,
    for (k = 0; k < n; k++)
       ref_apply_item(cap, ref, isleq, items[k].p, items[k].w, items[k].u);
 
-   if (!dp_equal(cap, lift_dp.dplist, ref)) {
+   if (!dp_equal(cap, lift_dp.dptlist, ref)) {
       char buf[128];
-      snprintf(buf, sizeof(buf), "%s: pure DP != reference", tag);
+      snprintf(buf, sizeof(buf), "%s: pure DPT != reference", tag);
       fail(buf);
    }
 
-   if (lift_dl.isDL && !dl_monotone(&lift_dl, isleq)) {
+   if (lift_dl.isDPL && !dl_monotone(&lift_dl, isleq)) {
       char buf[128];
-      snprintf(buf, sizeof(buf), "%s: DL not monotone (thr=%.0f isleq=%d)", tag,
+      snprintf(buf, sizeof(buf), "%s: DPL not monotone (thr=%.0f isleq=%d)", tag,
             threshold, isleq);
       fail(buf);
       print_dl(&lift_dl);
       if (!isleq) {
-         if (dp_equal(cap, lift_dp.dplist, ref)) {
-            snprintf(buf, sizeof(buf), "%s: DP path OK (geq DL merge suspect)", tag);
+         if (dp_equal(cap, lift_dp.dptlist, ref)) {
+            snprintf(buf, sizeof(buf), "%s: DPT path OK (geq DPL merge suspect)", tag);
             ok(buf);
          }
          Lifting_Free(&lift_dl);
@@ -267,44 +267,44 @@ static void test_dp_dl_table_agree(const char* tag, int isleq, int cap,
       }
    }
 
-   if (lift_dl.isDL) {
+   if (lift_dl.isDPL) {
       Lifting_Expand(&lift_dl);
       if (isleq) {
-         if (!dp_equal(cap, lift_dl.dplist, ref)) {
+         if (!dp_equal(cap, lift_dl.dptlist, ref)) {
             char buf[128];
-            snprintf(buf, sizeof(buf), "%s: Expand(DL) != reference DP", tag);
+            snprintf(buf, sizeof(buf), "%s: Expand(DPL) != reference DPT", tag);
             fail(buf);
          }
       }
-      if (isleq && !dp_equal(cap, lift_dl.dplist, lift_dp.dplist)) {
+      if (isleq && !dp_equal(cap, lift_dl.dptlist, lift_dp.dptlist)) {
          char buf[128];
-         snprintf(buf, sizeof(buf), "%s: Expand(DL) != DP path (thr=200)", tag);
+         snprintf(buf, sizeof(buf), "%s: Expand(DPL) != DPT path (thr=200)", tag);
          fail(buf);
          for (j = 0; j <= cap; j++) {
-            if (!ISEQ(lift_dl.dplist[j], lift_dp.dplist[j]))
+            if (!ISEQ(lift_dl.dptlist[j], lift_dp.dptlist[j]))
                printf("    j=%d dl=%.4f dp=%.4f ref=%.4f\n", j,
-                     lift_dl.dplist[j], lift_dp.dplist[j], ref[j]);
+                     lift_dl.dptlist[j], lift_dp.dptlist[j], ref[j]);
          }
       } else if (!isleq) {
          char buf[160];
-         snprintf(buf, sizeof(buf), "%s Expand(DL) OK (geq min>=j) thr=%.0f n=%d",
+         snprintf(buf, sizeof(buf), "%s Expand(DPL) OK (geq min>=j) thr=%.0f n=%d",
                tag, threshold, n);
          ok(buf);
       } else {
          char buf[160];
-         snprintf(buf, sizeof(buf), "%s DP==Expand(DL) thr=%.0f isleq=%d n=%d",
+         snprintf(buf, sizeof(buf), "%s DPT==Expand(DPL) thr=%.0f isleq=%d n=%d",
                tag, threshold, isleq, n);
          ok(buf);
       }
    } else {
-      /* switched to DP mid-way */
-      if (!dp_equal(cap, lift_dl.dplist, lift_dp.dplist)) {
+      /* switched to DPT mid-way */
+      if (!dp_equal(cap, lift_dl.dptlist, lift_dp.dptlist)) {
          char buf[128];
-         snprintf(buf, sizeof(buf), "%s: DL-path DP != pure DP path", tag);
+         snprintf(buf, sizeof(buf), "%s: DPL-path DPT != pure DPT path", tag);
          fail(buf);
       } else {
          char buf[160];
-         snprintf(buf, sizeof(buf), "%s DL switched to DP, tables match", tag);
+         snprintf(buf, sizeof(buf), "%s DPL switched to DPT, tables match", tag);
          ok(buf);
       }
    }
@@ -313,11 +313,11 @@ static void test_dp_dl_table_agree(const char* tag, int isleq, int cap,
    Lifting_Free(&lift_dp);
 }
 
-/* Findsol vs DP queries at several capacities */
+/* Findsol vs DPT queries at several capacities */
 static void test_findsol_vs_dp(const char* tag, int isleq, int cap,
       int n, const Item* items)
 {
-   DLLifting lift_dl;
+   DPLifting lift_dl;
    double ref[256];
    double queries[] = {0, 1, 3, 5, 8, 12, 18, 25};
    int nq = (int)(sizeof(queries) / sizeof(queries[0]));
@@ -336,14 +336,14 @@ static void test_findsol_vs_dp(const char* tag, int isleq, int cap,
    if (!setup_lift(&lift_dl, cap, isleq, 10.0))
       return;
    build_items(&lift_dl, isleq, 10.0, n, items, 0);
-   if (!lift_dl.isDL) {
+   if (!lift_dl.isDPL) {
       Lifting_Free(&lift_dl);
-      ok("(skip Findsol: DL switched to DP)");
+      ok("(skip Findsol: DPL switched to DPT)");
       return;
    }
    if (!dl_monotone(&lift_dl, isleq)) {
       char buf[160];
-      snprintf(buf, sizeof(buf), "%s DL not monotone (Findsol)", tag);
+      snprintf(buf, sizeof(buf), "%s DPL not monotone (Findsol)", tag);
       fail(buf);
       Lifting_Free(&lift_dl);
       return;
@@ -352,7 +352,7 @@ static void test_findsol_vs_dp(const char* tag, int isleq, int cap,
 
    for (qi = 0; qi < nq; qi++) {
       double q = queries[qi];
-      int jq = (int)floor(q + EPS_DL);
+      int jq = (int)floor(q + EPS_DPL);
       if (jq > cap)
          continue;
       double got = Lifting_Findsol(&lift_dl, q, 0, lift_dl.n_soltable - 1, isleq);
@@ -361,15 +361,15 @@ static void test_findsol_vs_dp(const char* tag, int isleq, int cap,
          want = ref_max_p_at_most(cap, ref, q);
       } else {
          int t;
-         want = INF_DL;
+         want = INF_DPL;
          for (t = 0; t < lift_dl.n_soltable; t++) {
             if (ISGE(lift_dl.wsum[t], q) && ISLT(lift_dl.psum[t], want))
                want = lift_dl.psum[t];
          }
       }
-      if (!ISEQ(got, want) && !(got >= INF_DL / 2 && want >= INF_DL / 2)) {
+      if (!ISEQ(got, want) && !(got >= INF_DPL / 2 && want >= INF_DPL / 2)) {
          printf("  %s q=%.0f got=%.4f want=%.4f dp[j]=%.4f\n",
-               tag, q, got, want, lift_dl.dplist[jq]);
+               tag, q, got, want, lift_dl.dptlist[jq]);
          char buf[128];
          snprintf(buf, sizeof(buf), "%s Findsol mismatch", tag);
          fail(buf);
@@ -379,7 +379,7 @@ static void test_findsol_vs_dp(const char* tag, int isleq, int cap,
    }
    {
       char buf[128];
-      snprintf(buf, sizeof(buf), "%s Findsol vs DP ref", tag);
+      snprintf(buf, sizeof(buf), "%s Findsol vs DPT ref", tag);
       ok(buf);
    }
    Lifting_Free(&lift_dl);
@@ -399,9 +399,9 @@ static int lifted_cut_valid(int isleq, int n, const double* p, const double* w,
          wsum += w[i] * x[i];
          lhs += p[i] * x[i];
       }
-      int knap_ok = isleq ? (wsum <= cap + EPS_DL) : (wsum + EPS_DL >= cap);
+      int knap_ok = isleq ? (wsum <= cap + EPS_DPL) : (wsum + EPS_DPL >= cap);
       /* <= knapsack → <= cut; >= knapsack → >= cut (cover / sequential lifting) */
-      int cut_ok = isleq ? (lhs <= rhs + EPS_DL) : (lhs + EPS_DL >= rhs);
+      int cut_ok = isleq ? (lhs <= rhs + EPS_DPL) : (lhs + EPS_DPL >= rhs);
       if (knap_ok && !cut_ok)
          return 0;
       i = 0;
@@ -419,21 +419,21 @@ static void test_lifting_dp_valid(const char* tag, int isleq, int n,
       int* seed, int n_seed, int* order, int n_ord)
 {
    double rhs;
-   DLLifting L;
+   DPLifting L;
    memset(&L, 0, sizeof(L));
    if (!lifting(&L, p, w, u, isuseub, cap, 0, seed, n_seed, order, n_ord,
-            &rhs, isleq, NULL, n, 0.0, 0.0, DLLIFTING_MODE_DP)) {
-      fail("lifting DP failed");
+            &rhs, isleq, NULL, n, 0.0, 0.0, DPLIFTING_MODE_DPT)) {
+      fail("lifting DPT failed");
       return;
    }
    if (!lifted_cut_valid(isleq, n, p, w, u, cap, rhs)) {
       char buf[128];
-      snprintf(buf, sizeof(buf), "%s: DP lift cut invalid", tag);
+      snprintf(buf, sizeof(buf), "%s: DPT lift cut invalid", tag);
       fail(buf);
       return;
    }
    char buf[200];
-   snprintf(buf, sizeof(buf), "%s DP-only lift valid (MODE_DP)", tag);
+   snprintf(buf, sizeof(buf), "%s DPT-only lift valid (MODE_DPT)", tag);
    ok(buf);
 }
 
@@ -450,32 +450,32 @@ static void test_lifting_dl_dp_agree(const char* tag, int isleq, int n,
    memcpy(p_dl, p, (size_t)n * sizeof(double));
    memcpy(p_dp, p, (size_t)n * sizeof(double));
 
-   DLLifting Ld, Lp;
+   DPLifting Ld, Lp;
    memset(&Ld, 0, sizeof(Ld));
    memset(&Lp, 0, sizeof(Lp));
 
    if (!lifting(&Ld, p_dl, w, u, isuseub, cap, 0, seed, n_seed, order, n_ord,
-            &rhs_dl, isleq, NULL, n, 0.0, 0.0, DLLIFTING_MODE_DL)) {
+            &rhs_dl, isleq, NULL, n, 0.0, 0.0, DPLIFTING_MODE_DPL)) {
       char buf[128];
-      snprintf(buf, sizeof(buf), "%s: lifting DL path failed", tag);
+      snprintf(buf, sizeof(buf), "%s: lifting DPL path failed", tag);
       fail(buf);
       return;
    }
    if (!lifting(&Lp, p_dp, w, u, isuseub, cap, 0, seed, n_seed, order, n_ord,
-            &rhs_dp, isleq, NULL, n, 0.0, 0.0, DLLIFTING_MODE_DP)) {
-      fail("lifting DP failed");
+            &rhs_dp, isleq, NULL, n, 0.0, 0.0, DPLIFTING_MODE_DPT)) {
+      fail("lifting DPT failed");
       return;
    }
 
    if (!ISEQ(rhs_dl, rhs_dp)) {
       printf("  %s rhs dl=%.6f dp=%.6f\n", tag, rhs_dl, rhs_dp);
-      fail(isleq ? "lifting rhs DL!=DP (leq)" : "lifting rhs DL!=DP (geq)");
+      fail(isleq ? "lifting rhs DPL!=DPT (leq)" : "lifting rhs DPL!=DPT (geq)");
       return;
    }
    for (i = 0; i < n; i++) {
       if (!ISEQ(p_dl[i], p_dp[i])) {
          printf("  %s p[%d] dl=%.6f dp=%.6f\n", tag, i, p_dl[i], p_dp[i]);
-         fail(isleq ? "lifting coeffs DL!=DP (leq)" : "lifting coeffs DL!=DP (geq)");
+         fail(isleq ? "lifting coeffs DPL!=DPT (leq)" : "lifting coeffs DPL!=DPT (geq)");
          return;
       }
    }
@@ -485,14 +485,14 @@ static void test_lifting_dl_dp_agree(const char* tag, int isleq, int n,
    }
    {
       char buf[200];
-      snprintf(buf, sizeof(buf), "%s full lift DL==DP valid", tag);
+      snprintf(buf, sizeof(buf), "%s full lift DPL==DPT valid", tag);
       ok(buf);
    }
 }
 
 static void test_findind_both()
 {
-   DLLifting lift;
+   DPLifting lift;
    double wsum[] = {0, 3, 7, 12, 20};
    double psum[] = {0, 1, 2, 4, 5};
    int i;
@@ -516,7 +516,7 @@ static void test_findind_both()
 
 static void test_compress_expand_roundtrip()
 {
-   DLLifting lift;
+   DPLifting lift;
    int cap = 20;
    Item items[] = {{1, 3, 1}, {4, 5, 1}, {2, 7, 1}};
    double ref[64];
@@ -532,13 +532,13 @@ static void test_compress_expand_roundtrip()
 
    Lifting_Compress(&lift, 0);
    if (!dl_monotone(&lift, 1)) {
-      fail("Compress: DL not monotone");
+      fail("Compress: DPL not monotone");
       Lifting_Free(&lift);
       return;
    }
    Lifting_Expand(&lift);
-   if (!dp_equal(cap, lift.dplist, ref)) {
-      fail("Compress->Expand != DP");
+   if (!dp_equal(cap, lift.dptlist, ref)) {
+      fail("Compress->Expand != DPT");
       Lifting_Free(&lift);
       return;
    }
@@ -557,10 +557,10 @@ static void test_compress_expand_roundtrip()
       double saved[64];
       int jj;
       for (jj = 0; jj <= cap; jj++)
-         saved[jj] = lift.dplist[jj];
+         saved[jj] = lift.dptlist[jj];
       Lifting_Compress(&lift, 0);
       Lifting_Expand(&lift);
-      if (!dp_equal(cap, lift.dplist, saved))
+      if (!dp_equal(cap, lift.dptlist, saved))
          fail("Compress/Expand geq roundtrip");
       else
          ok("Compress/Expand roundtrip (geq)");
@@ -796,18 +796,18 @@ static void test_random_lifting(int trials)
 }
 
 static int run_main() {
-   printf("======== DLLifting comprehensive tests ========\n\n");
+   printf("======== DPLifting comprehensive tests ========\n\n");
 
    printf("--- Unit: Findind ---\n");
    test_findind_both();
 
-   printf("\n--- DP / DL table (multi threshold) ---\n");
+   printf("\n--- DPT / DPL table (multi threshold) ---\n");
    run_all_table_cases();
 
    printf("\n--- Compress / Expand ---\n");
    test_compress_expand_roundtrip();
 
-   printf("\n--- Full lifting DL vs DP ---\n");
+   printf("\n--- Full lifting DPL vs DPT ---\n");
    run_all_lifting_cases();
 
    printf("\n--- Bounded integer lifting (u>1) ---\n");
@@ -844,13 +844,13 @@ static void ok(const char* msg)
    printf("OK: %s\n", msg);
 }
 
-/* Reference DP matching Lifting_Reset + repeated Lifting_DPiter (!isleq), 0-1 per add. */
+/* Reference DPT matching Lifting_Reset + repeated Lifting_DPTiter (!isleq), 0-1 per add. */
 static void ref_dp_geq(int cap, double* dp, int nw, const double* pw, const double* pp)
 {
    int i, j, k;
    double old[512];
    for (i = 0; i <= cap; i++)
-      dp[i] = (i == 0 ? 0.0 : INF_DL);
+      dp[i] = (i == 0 ? 0.0 : INF_DPL);
    if (cap + 1 > (int)(sizeof(old) / sizeof(old[0])))
       return;
    for (k = 0; k < nw; k++) {
@@ -864,7 +864,7 @@ static void ref_dp_geq(int cap, double* dp, int nw, const double* pw, const doub
          double cand;
          if (j <= w)
             cand = p;
-         else if (old[j - w] >= INF_DL / 2)
+         else if (old[j - w] >= INF_DPL / 2)
             continue;
          else
             cand = p + old[j - w];
@@ -884,16 +884,16 @@ static int dp_tables_equal(int cap, const double* a, const double* b)
    return 1;
 }
 
-/* For >= knapsack: minimum p with total weight at least target (from full DP). */
+/* For >= knapsack: minimum p with total weight at least target (from full DPT). */
 static double ref_min_p_at_least(int cap, const double* dp, double target)
 {
    int j;
-   double best = INF_DL;
-   int t = (int)ceil(target - EPS_DL);
+   double best = INF_DPL;
+   int t = (int)ceil(target - EPS_DPL);
    if (t < 0)
       t = 0;
    if (t > cap)
-      return INF_DL;
+      return INF_DPL;
    for (j = t; j <= cap; j++) {
       if (dp[j] < best)
          best = dp[j];
@@ -901,7 +901,7 @@ static double ref_min_p_at_least(int cap, const double* dp, double target)
    return best;
 }
 
-static int setup_lift(DLLifting* lift, int cap, int isleq, double threshold)
+static int setup_lift(DPLifting* lift, int cap, int isleq, double threshold)
 {
    memset(lift, 0, sizeof(*lift));
    lift->isleq = isleq;
@@ -909,7 +909,7 @@ static int setup_lift(DLLifting* lift, int cap, int isleq, double threshold)
    lift->subcap = cap;
    lift->maxcap = cap;
    /* THRESHOLD mode required for mid-lift switching by τ vs bar b */
-   lift->force_mode = DLLIFTING_MODE_THRESHOLD;
+   lift->force_mode = DPLIFTING_MODE_THRESHOLD;
    if (!Lifting_Alloc(lift, cap, 1, threshold))
       return 0;
    lift->switch_cap = threshold;
@@ -918,7 +918,7 @@ static int setup_lift(DLLifting* lift, int cap, int isleq, double threshold)
    return 1;
 }
 
-static void teardown_lift(DLLifting* lift)
+static void teardown_lift(DPLifting* lift)
 {
    Lifting_Free(lift);
 }
@@ -926,7 +926,7 @@ static void teardown_lift(DLLifting* lift)
 /* ----- Lifting_Findind: isleq = 0 finds largest index with wsum[i] >= cap ----- */
 static void test_findind_geq()
 {
-   DLLifting lift;
+   DPLifting lift;
    memset(&lift, 0, sizeof(lift));
    double wsum[] = {0, 3, 7, 12, 20};
    double psum[] = {0, 1, 2, 4, 5};
@@ -967,10 +967,10 @@ static void test_findind_geq()
       ok("Findind leq cap=5 (sanity)");
 }
 
-/* ----- DP path (!isleq): one and multiple items ----- */
+/* ----- DPT path (!isleq): one and multiple items ----- */
 static void test_dp_geq_single_item()
 {
-   DLLifting lift;
+   DPLifting lift;
    double ref[64];
    int cap = 20;
 
@@ -980,21 +980,21 @@ static void test_dp_geq_single_item()
       return;
    }
 
-   lift.isDL = 0;
-   Lifting_DPiter(&lift, 5, 3.0);
+   lift.isDPL = 0;
+   Lifting_DPTiter(&lift, 5, 3.0);
 
    ref_dp_geq(cap, ref, 1, (const double[]){5}, (const double[]){3.0});
-   if (!dp_tables_equal(cap, lift.dplist, ref))
-      fail("DP geq single item w=5 p=3");
+   if (!dp_tables_equal(cap, lift.dptlist, ref))
+      fail("DPT geq single item w=5 p=3");
    else
-      ok("DP geq single item w=5 p=3");
+      ok("DPT geq single item w=5 p=3");
 
    teardown_lift(&lift);
 }
 
 static void test_dp_geq_multi_item()
 {
-   DLLifting lift;
+   DPLifting lift;
    double ref[128];
    int cap = 30;
    const double ws[] = {4, 7, 11};
@@ -1007,23 +1007,23 @@ static void test_dp_geq_multi_item()
       return;
    }
 
-   lift.isDL = 0;
+   lift.isDPL = 0;
    for (k = 0; k < 3; k++)
-      Lifting_DPiter(&lift, (int)ws[k], ps[k]);
+      Lifting_DPTiter(&lift, (int)ws[k], ps[k]);
 
    ref_dp_geq(cap, ref, 3, ws, ps);
-   if (!dp_tables_equal(cap, lift.dplist, ref))
-      fail("DP geq three items");
+   if (!dp_tables_equal(cap, lift.dptlist, ref))
+      fail("DPT geq three items");
    else
-      ok("DP geq three items");
+      ok("DPT geq three items");
 
    teardown_lift(&lift);
 }
 
-/* DL table invariants for >= (increasing weights, increasing minimum profits). */
+/* DPL table invariants for >= (increasing weights, increasing minimum profits). */
 static void test_dl_table_invariants_geq()
 {
-   DLLifting lift;
+   DPLifting lift;
    int cap = 25;
    const double ws[] = {3, 5, 8};
    const double ps[] = {1, 4, 6};
@@ -1034,7 +1034,7 @@ static void test_dl_table_invariants_geq()
       return;
    }
 
-   lift.isDL = 1;
+   lift.isDPL = 1;
    for (k = 0; k < 3; k++)
       Lifting_Multiply(&lift, ps[k], ws[k], 1);
 
@@ -1042,31 +1042,31 @@ static void test_dl_table_invariants_geq()
       if (!ISGT(lift.wsum[i], lift.wsum[i - 1])) {
          printf("  non-increasing wsum[%d]=%.2f wsum[%d]=%.2f\n",
                i - 1, lift.wsum[i - 1], i, lift.wsum[i]);
-         fail("DL geq: wsum not strictly increasing");
+         fail("DPL geq: wsum not strictly increasing");
          teardown_lift(&lift);
          return;
       }
       if (!ISGT(lift.psum[i], lift.psum[i - 1])) {
          printf("  non-increasing psum[%d]=%.2f psum[%d]=%.2f\n",
                i - 1, lift.psum[i - 1], i, lift.psum[i]);
-         fail("DL geq: psum not strictly increasing");
+         fail("DPL geq: psum not strictly increasing");
          teardown_lift(&lift);
          return;
       }
    }
    for (i = 0; i < lift.n_soltable; i++) {
-      if (lift.wsum[i] > lift.cap + EPS_DL) {
-         fail("DL geq: weight exceeds cap");
+      if (lift.wsum[i] > lift.cap + EPS_DPL) {
+         fail("DPL geq: weight exceeds cap");
          teardown_lift(&lift);
          return;
       }
    }
-   ok("DL geq table invariants (monotone wsum/psum)");
+   ok("DPL geq table invariants (monotone wsum/psum)");
 
    teardown_lift(&lift);
 }
 
-/* End-to-end: MODE_DL vs MODE_DP must agree. */
+/* End-to-end: MODE_DPL vs MODE_DPT must agree. */
 static void run_lifting_compare_paths(const char* name, int n,
       double* p_dl, double* w, double* u, int* isuseub,
       double cap, int* seed, int n_seed, int* order, int n_ord)
@@ -1082,35 +1082,35 @@ static void run_lifting_compare_paths(const char* name, int n,
 
    memcpy(p_dp, p_dl, (size_t)n * sizeof(double));
 
-   DLLifting lift_dl, lift_dp;
+   DPLifting lift_dl, lift_dp;
    memset(&lift_dl, 0, sizeof(lift_dl));
    memset(&lift_dp, 0, sizeof(lift_dp));
 
    if (!lifting(&lift_dl, p_dl, w, u, isuseub, cap, 0, seed, n_seed,
-            order, n_ord, &rhs_dl, 0, NULL, n, 0.0, 0.0, DLLIFTING_MODE_DL)) {
-      fail("DL path lifting failed");
+            order, n_ord, &rhs_dl, 0, NULL, n, 0.0, 0.0, DPLIFTING_MODE_DPL)) {
+      fail("DPL path lifting failed");
       return;
    }
 
    if (!lifting(&lift_dp, p_dp, w, u, isuseub, cap, 0, seed, n_seed,
-            order, n_ord, &rhs_dp, 0, NULL, n, 0.0, 0.0, DLLIFTING_MODE_DP)) {
-      fail("DP path lifting failed");
+            order, n_ord, &rhs_dp, 0, NULL, n, 0.0, 0.0, DPLIFTING_MODE_DPT)) {
+      fail("DPT path lifting failed");
       return;
    }
 
    if (!ISEQ(rhs_dl, rhs_dp)) {
       printf("  %s: rhs_dl=%.6f rhs_dp=%.6f\n", name, rhs_dl, rhs_dp);
-      fail("DL vs DP path rhs mismatch (geq)");
+      fail("DPL vs DPT path rhs mismatch (geq)");
       return;
    }
    for (i = 0; i < n; i++) {
       if (!ISEQ(p_dl[i], p_dp[i])) {
          printf("  %s: p[%d] dl=%.6f dp=%.6f\n", name, i, p_dl[i], p_dp[i]);
-         fail("DL vs DP path coefficients mismatch (geq)");
+         fail("DPL vs DPT path coefficients mismatch (geq)");
          return;
       }
    }
-   printf("OK: %s DL/DP paths agree (rhs=%.4f)\n", name, rhs_dl);
+   printf("OK: %s DPL/DPT paths agree (rhs=%.4f)\n", name, rhs_dl);
 }
 
 /* Enumerate all bounded assignments; check lifted inequality on >= knapsack. */
@@ -1118,7 +1118,7 @@ static int all_feasible_geq(int n, const double* w, const double* u, double cap,
       int* x, int idx, double wsum)
 {
    if (idx == n)
-      return wsum + EPS_DL >= cap;
+      return wsum + EPS_DPL >= cap;
    int xi;
    for (xi = 0; xi <= (int)u[idx]; xi++) {
       x[idx] = xi;
@@ -1146,13 +1146,13 @@ static int lifted_cut_valid(int isleq, int n, const double* p, const double* w,
       for (i = 0; i < n; i++)
          wsum += w[i] * x[i];
       int feasible = isleq
-            ? (wsum <= cap + EPS_DL)
-            : (wsum + EPS_DL >= cap);
+            ? (wsum <= cap + EPS_DPL)
+            : (wsum + EPS_DPL >= cap);
       if (feasible) {
          double lhs = 0;
          for (i = 0; i < n; i++)
             lhs += p[i] * x[i];
-         int ok_cut = isleq ? (lhs <= rhs + EPS_DL) : (lhs + EPS_DL >= rhs);
+         int ok_cut = isleq ? (lhs <= rhs + EPS_DPL) : (lhs + EPS_DPL >= rhs);
          if (!ok_cut) {
             printf("  violated at x=(");
             for (i = 0; i < n; i++)
@@ -1184,18 +1184,18 @@ static double brute_up_alpha_geq(double rhs, double a, double u,
       double need = subcap - j * a;
       double base = rhs;
       int t;
-      if (need > wtab[ntab - 1] + EPS_DL)
+      if (need > wtab[ntab - 1] + EPS_DPL)
          continue;
-      if (need <= 0 + EPS_DL) {
+      if (need <= 0 + EPS_DPL) {
          /* empty remainder */
       } else {
          int found = 0;
-         double bestp = INF_DL;
+         double bestp = INF_DPL;
          for (t = 0; t < ntab; t++) {
-            if (wtab[t] + EPS_DL >= need && ptab[t] < bestp)
+            if (wtab[t] + EPS_DPL >= need && ptab[t] < bestp)
                bestp = ptab[t];
          }
-         if (bestp >= INF_DL / 2)
+         if (bestp >= INF_DPL / 2)
             continue;
          base = rhs - bestp;
       }
@@ -1210,7 +1210,7 @@ static void run_lifting_case_ex(const char* name, int isleq, double threshold,
       int n, double* p, double* w, double* u, int* isuseub,
       double cap, int* seed, int n_seed, int* liftingorder, int n_liftingorder)
 {
-   DLLifting lift;
+   DPLifting lift;
    double rhs;
    int i;
 
@@ -1219,7 +1219,7 @@ static void run_lifting_case_ex(const char* name, int isleq, double threshold,
 
    if (!lifting(&lift, p, w, u, isuseub, cap, 0, seed, n_seed,
             liftingorder, n_liftingorder, &rhs, isleq, NULL, n, threshold, 0.0,
-            DLLIFTING_MODE_DP)) {
+            DPLIFTING_MODE_DPT)) {
       fail(name);
       printf("  lifting() returned 0\n");
       return;
@@ -1242,7 +1242,7 @@ static void run_lifting_case(const char* name, int isleq,
       int n, double* p, double* w, double* u, int* isuseub,
       double cap, int* seed, int n_seed, int* liftingorder, int n_liftingorder)
 {
-   /* MODE_DP: reliable for >= path */
+   /* MODE_DPT: reliable for >= path */
    run_lifting_case_ex(name, isleq, 0.0, n, p, w, u, isuseub, cap, seed, n_seed,
          liftingorder, n_liftingorder);
 }
@@ -1259,7 +1259,7 @@ static void test_full_lifting_geq_tiny()
    run_lifting_case("geq_tiny_3var", 0, 3, p, w, u, isuseub, 5.0, seed, 1, order, 2);
 }
 
-/* Same instance on DL path (threshold=10); documents DL-merge behaviour. */
+/* Same instance on DPL path (threshold=10); documents DPL-merge behaviour. */
 static void test_full_lifting_geq_tiny_dl()
 {
    double p[3] = {1, 0, 0};
@@ -1268,7 +1268,7 @@ static void test_full_lifting_geq_tiny_dl()
    int isuseub[3] = {0, 0, 0};
    int seed[1] = {0};
    int order[2] = {1, 2};
-   run_lifting_case_ex("geq_tiny_3var_DL", 0, 10.0, 3, p, w, u, isuseub, 5.0,
+   run_lifting_case_ex("geq_tiny_3var_DPL", 0, 10.0, 3, p, w, u, isuseub, 5.0,
          seed, 1, order, 2);
 }
 
@@ -1310,7 +1310,7 @@ static void test_full_lifting_geq_large_u()
 /* Compare one up-lifting step against brute force on built table */
 static void test_up_lifting_step_geq()
 {
-   DLLifting lift;
+   DPLifting lift;
    double pcoef = 0;
    double rhs = 2.0;
    double ws[] = {2, 4, 6};
@@ -1325,7 +1325,7 @@ static void test_up_lifting_step_geq()
    for (k = 0; k < 3; k++)
       Lifting_Multiply(&lift, ps[k], ws[k], 1);
 
-   /* Snapshot DP before Up mutates the table. */
+   /* Snapshot DPT before Up mutates the table. */
    {
       int j, u0;
       double best = 0.0;
@@ -1334,9 +1334,9 @@ static void test_up_lifting_step_geq()
       if (c > 31)
          c = 31;
       for (j = 0; j <= c; j++)
-         snap[j] = lift.dplist[j];
+         snap[j] = lift.dptlist[j];
 
-      u0 = (int)ceil(MIN_DL(2.0, lift.subcap / 3.0) - EPS_DL);
+      u0 = (int)ceil(MIN_DPL(2.0, lift.subcap / 3.0) - EPS_DPL);
       if (u0 < 1)
          u0 = 1;
       for (j = 1; j <= u0; j++) {
@@ -1363,33 +1363,33 @@ static void test_up_lifting_step_geq()
    teardown_lift(&lift);
 }
 
-/* τ > bar b^k: Multiply switches to DP mode (isDL=false) */
+/* τ > bar b^k: Multiply switches to DPT mode (isDPL=false) */
 static void test_dp_mode_switch()
 {
-   DLLifting lift;
+   DPLifting lift;
    int cap = 18;
 
-   /* switch_cap=100 >> bar b (=18) → prefer DP */
+   /* switch_cap=100 >> bar b (=18) → prefer DPT */
    if (!setup_lift(&lift, cap, 0, 100.0)) {
       fail("alloc test_dp_mode_switch");
       return;
    }
 
-   lift.isDL = 1;
+   lift.isDPL = 1;
    Lifting_Multiply(&lift, 4.0, 5.0, 2);
-   if (!lift.isDL)
-      ok("tau > bar_b switches to DP after Multiply");
+   if (!lift.isDPL)
+      ok("tau > bar_b switches to DPT after Multiply");
    else
-      fail("tau > bar_b should set isDL=false");
+      fail("tau > bar_b should set isDPL=false");
 
    teardown_lift(&lift);
 }
 
 static void test_select_backend_policy()
 {
-   DLLiftingFeatures feat;
-   DLLiftingPolicy pol;
-   dllifting_policy_default(&pol);
+   DPLiftingFeatures feat;
+   DPLiftingPolicy pol;
+   dplifting_policy_default(&pol);
 
    feat.rho_w = 3.0;
    feat.beta = 10.0;
@@ -1397,30 +1397,30 @@ static void test_select_backend_policy()
    feat.w_mean = 20.0;
    feat.w_min = 10.0;
    feat.w_max = 30.0;
-   if (dllifting_select_backend(&feat, &pol) == DLLIFTING_MODE_DP)
-      ok("narrow+large beta → DP");
+   if (dplifting_select_backend(&feat, &pol) == DPLIFTING_MODE_DPT)
+      ok("narrow+large beta → DPT");
    else
-      fail("expected DP for rho=3 beta=10");
+      fail("expected DPT for rho=3 beta=10");
 
    feat.rho_w = 10.0;
-   if (dllifting_select_backend(&feat, &pol) == DLLIFTING_MODE_DL)
-      ok("wide rho → DL");
+   if (dplifting_select_backend(&feat, &pol) == DPLIFTING_MODE_DPL)
+      ok("wide rho → DPL");
    else
-      fail("expected DL for rho=10");
+      fail("expected DPL for rho=10");
 
    feat.rho_w = 3.0;
    feat.beta = 4.0;
-   if (dllifting_select_backend(&feat, &pol) == DLLIFTING_MODE_DL)
-      ok("small beta → DL");
+   if (dplifting_select_backend(&feat, &pol) == DPLIFTING_MODE_DPL)
+      ok("small beta → DPL");
    else
-      fail("expected DL for beta=4");
+      fail("expected DPL for beta=4");
 
    feat.beta = 20.0;
    feat.u_bar = 1.5;
-   if (dllifting_select_backend(&feat, &pol) == DLLIFTING_MODE_DL)
-      ok("near-binary u_bar → DL");
+   if (dplifting_select_backend(&feat, &pol) == DPLIFTING_MODE_DPL)
+      ok("near-binary u_bar → DPL");
    else
-      fail("expected DL for u_bar=1.5");
+      fail("expected DPL for u_bar=1.5");
 }
 
 /* Random micro-instances with a seed that covers (required for a valid init cut) */
@@ -1472,18 +1472,18 @@ static void test_leq_geq_dual_feasibility()
 }
 
 static int run_main() {
-      printf("=== DLLifting isleq=0 (>= knapsack) tests ===\n\n");
+      printf("=== DPLifting isleq=0 (>= knapsack) tests ===\n\n");
 
       test_findind_geq();
       test_dp_geq_single_item();
       test_dp_geq_multi_item();
-      /* DL merge for >= is exercised in test_dl_dp_paths_agree / geq_tiny_dl */
+      /* DPL merge for >= is exercised in test_dl_dp_paths_agree / geq_tiny_dl */
       test_up_lifting_step_geq();
       test_dp_mode_switch();
       test_select_backend_policy();
       test_full_lifting_geq_tiny();
    #if 0
-      /* Re-enable when Lifting_Mergesort(!isleq) DL table is verified */
+      /* Re-enable when Lifting_Mergesort(!isleq) DPL table is verified */
       test_full_lifting_geq_tiny_dl();
       test_dl_dp_paths_agree();
    #endif
@@ -1501,7 +1501,7 @@ static int run_main() {
 namespace mixed_tests {
 #define MAX_MIX 32
 static const char* BUILD_TAG =
-#ifdef DLLIFTING_REDUCTION
+#ifdef DPLIFTING_REDUCTION
    "R";
 #else
    "N";
@@ -1552,7 +1552,7 @@ static double compute_subcap(const MixedCase& c)
 
 static int subcap_feasible(const MixedCase& c)
 {
-   return compute_subcap(c) >= -EPS_DL;
+   return compute_subcap(c) >= -EPS_DPL;
 }
 
 struct LiftOutcome {
@@ -1563,7 +1563,7 @@ struct LiftOutcome {
    int reduction_active;
 };
 
-static LiftOutcome run_lifting_once(const MixedCase& c, int isdl_mode)
+static LiftOutcome run_lifting_once(const MixedCase& c, int isdpl_mode)
 {
    LiftOutcome out;
    memset(&out, 0, sizeof(out));
@@ -1578,17 +1578,17 @@ static LiftOutcome run_lifting_once(const MixedCase& c, int isdl_mode)
    memcpy(order, c.order, (size_t)c.n_ord * sizeof(int));
 
    double rhs = 0.0;
-   DLLifting lift;
+   DPLifting lift;
    memset(&lift, 0, sizeof(lift));
 
    clock_t t0 = clock();
    out.ok = lifting(&lift, p, w, u, isuseub, c.cap, 0,
          seed, c.n_seed, order, c.n_ord, &rhs, 1, NULL, c.n, 0.0, 0.0,
-         isdl_mode);
+         isdpl_mode);
    out.duration = (double)(clock() - t0) / CLOCKS_PER_SEC;
    out.rhs = rhs;
    memcpy(out.p, p, (size_t)c.n * sizeof(double));
-#ifdef DLLIFTING_REDUCTION
+#ifdef DPLIFTING_REDUCTION
    out.reduction_active = lift.reduction_active;
 #else
    out.reduction_active = 0;
@@ -1640,11 +1640,11 @@ static void print_outcome(const char* case_name, const char* algo, const MixedCa
 
 static void test_case_impl(const MixedCase& c)
 {
-   LiftOutcome dl = run_lifting_once(c, DLLIFTING_MODE_DL);
-   LiftOutcome dp = run_lifting_once(c, DLLIFTING_MODE_DP);
+   LiftOutcome dl = run_lifting_once(c, DPLIFTING_MODE_DPL);
+   LiftOutcome dp = run_lifting_once(c, DPLIFTING_MODE_DPT);
 
-   print_outcome(c.name, "DL", c, dl);
-   print_outcome(c.name, "DP", c, dp);
+   print_outcome(c.name, "DPL", c, dl);
+   print_outcome(c.name, "DPT", c, dp);
 
    if (!outcome_sane(dl, c.n) || !outcome_sane(dp, c.n)) {
       printf("WARN: %s invalid or huge coefficients\n", c.name);
@@ -1652,10 +1652,10 @@ static void test_case_impl(const MixedCase& c)
       return;
    }
    if (!coeffs_match(dl, dp, c.n)) {
-      printf("WARN: %s DL!=DP rhs=%.4f/%.4f\n", c.name, dl.rhs, dp.rhs);
+      printf("WARN: %s DPL!=DPT rhs=%.4f/%.4f\n", c.name, dl.rhs, dp.rhs);
       g_warn++;
    } else {
-      printf("OK: %s DL==DP\n", c.name);
+      printf("OK: %s DPL==DPT\n", c.name);
       g_ok++;
    }
    if (any_unbounded(c.n, c.w, c.u, c.cap) && dl.reduction_active) {
@@ -1953,7 +1953,7 @@ int main(int argc, char** argv)
       printf("\n");
       mixed_tests::run_main();
    } else {
-      printf("\n(Use ./test_dllifting --all or `make test-all` for mixed suite.)\n");
+      printf("\n(Use ./test_dplifting --all or `make test-all` for mixed suite.)\n");
    }
    /* Exit code = total failure count (core + geq), capped at 255 for POSIX. */
    if (fail <= 0)

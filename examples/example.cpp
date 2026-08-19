@@ -1,16 +1,16 @@
 /**
- * DLLifting example — 5-variable bounded knapsack (same as README).
+ * DPLifting example — 5-variable bounded knapsack (same as README).
  *
  *   C = {x1,x2}, N0 = {x3,x4}, Nu = {x5}, lift order {x3,x4,x5}
  *   seed: 2x1 + x2 <= 4 on residual capacity b^2 = 18
  */
-#include <DLLifting.h>
+#include <DPLifting.h>
 #include <cstdio>
 
 static void print_cut(int n, const double* coef, double rhs) {
    std::printf("  ");
    for (int i = 0; i < n; i++) {
-      if (coef[i] > EPS_DL)
+      if (coef[i] > EPS_DPL)
          std::printf("%.4f*x_%d + ", coef[i], i + 1);
    }
    std::printf("<= %.4f\n", rhs);
@@ -26,28 +26,28 @@ int main(void) {
    int order[] = {2, 3, 4};           /* lift x3, x4, x5 */
    double rhs = 0.0;
 
-   DLLifting lift = {};
+   DPLifting lift = {};
    if (!lifting(&lift, p, w, u, isuseub, 18.0, 1,
             seed, 2, order, 3, &rhs, 1, nullptr, n,
-            /* threshold */ 0.0, /* duration */ 0.0, DLLIFTING_MODE_DP)) {
+            /* threshold */ 0.0, /* duration */ 0.0, DPLIFTING_MODE_DPT)) {
       std::fprintf(stderr, "lifting failed\n");
       return 1;
    }
 
-   std::printf("lifting() MODE_DP (README 5-var example):\n");
+   std::printf("lifting() MODE_DPT (README 5-var example):\n");
    print_cut(n, p, rhs);
    std::printf("  (%.4f s)\n", lift.duration);
 
    /* Same instance via C ABI */
    double coef[] = {2.0, 1.0, 0.0, 0.0, 0.0};
    rhs = 0.0;
-   if (dllifting_lift_cover(n, coef, w, u, isuseub, 18.0, 1,
-            seed, 2, order, 3, &rhs, 1, 0.0, DLLIFTING_MODE_DP, nullptr)
-         != DLLIFTING_OK) {
-      std::fprintf(stderr, "dllifting_lift_cover failed\n");
+   if (dplifting_lift_cover(n, coef, w, u, isuseub, 18.0, 1,
+            seed, 2, order, 3, &rhs, 1, 0.0, DPLIFTING_MODE_DPT, nullptr)
+         != DPLIFTING_OK) {
+      std::fprintf(stderr, "dplifting_lift_cover failed\n");
       return 1;
    }
-   std::printf("dllifting_lift_cover:\n");
+   std::printf("dplifting_lift_cover:\n");
    print_cut(n, coef, rhs);
    return 0;
 }
